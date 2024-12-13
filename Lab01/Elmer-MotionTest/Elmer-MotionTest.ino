@@ -220,176 +220,6 @@ void runToStop ( void ) {
   }
 }
 
-
-/*
-   The move1() function will move the robot forward one full rotation and backwared on
-   full rotation.  Recall that that there 200 steps in one full rotation or 1.8 degrees per
-   step. This function uses setting the step pins high and low with delays to move. The speed is set by
-   the length of the delay.
-*/
-void move1() {
-  Serial.println("move1 function");
-  digitalWrite(redLED, HIGH);//turn on red LED
-  digitalWrite(grnLED, LOW);//turn off green LED
-  digitalWrite(ylwLED, LOW);//turn off yellow LED
-  digitalWrite(ltDirPin, HIGH); // Enables the motor to move in a particular direction
-  digitalWrite(rtDirPin, HIGH); // Enables the motor to move in a particular direction
-  // Makes 800 pulses for making one full cycle rotation
-  for (int x = 0; x < 800; x++) {
-    digitalWrite(rtStepPin, HIGH);
-    digitalWrite(ltStepPin, HIGH);
-    delayMicroseconds(stepTime);
-    digitalWrite(rtStepPin, LOW);
-    digitalWrite(ltStepPin, LOW);
-    delayMicroseconds(stepTime);
-  }
-  delay(1000); // One second delay
-  digitalWrite(ltDirPin, LOW); // Enables the motor to move in opposite direction
-  digitalWrite(rtDirPin, LOW); // Enables the motor to move in opposite direction
-  // Makes 800 pulses for making one full cycle rotation
-  for (int x = 0; x < 800; x++) {
-    digitalWrite(rtStepPin, HIGH);
-    digitalWrite(ltStepPin, HIGH);
-    delayMicroseconds(stepTime);
-    digitalWrite(rtStepPin, LOW);
-    digitalWrite(ltStepPin, LOW);
-    delayMicroseconds(stepTime);
-  }
-  delay(1000); // One second delay
-}
-
-/*
-   The move2() function will use AccelStepper library functions to move the robot
-   move() is a library function for relative movement to set a target position
-   moveTo() is a library function for absolute movement to set a target position
-   stop() is a library function that causes the stepper to stop as quickly as possible
-   run() is a library function that uses accel and decel to achieve target position, no blocking
-   runSpeed() is a library function that uses constant speed to achieve target position, no blocking
-   runToPosition() is a library function that uses blocking with accel/decel to achieve target position
-   runSpeedToPosition() is a library function that uses constant speed to achieve target posiiton, no blocking
-   runToNewPosition() is a library function that uses blocking with accel/decel to achieve target posiiton
-*/
-void move2() {
-  Serial.println("move2 function");
-  digitalWrite(redLED, LOW);//turn off red LED
-  digitalWrite(grnLED, HIGH);//turn on green LED
-  digitalWrite(ylwLED, LOW);//turn off yellow LED
-  stepperRight.moveTo(800);//move one full rotation forward relative to current position
-  stepperLeft.moveTo(800);//move one full rotation forward relative to current position
-  stepperRight.setSpeed(1000);//set right motor speed
-  stepperLeft.setSpeed(1000);//set left motor speed
-  stepperRight.runSpeedToPosition();//move right motor
-  stepperLeft.runSpeedToPosition();//move left motor
-  runToStop();//run until the robot reaches the target
-  delay(1000); // One second delay
-  stepperRight.moveTo(0);//move one full rotation backward relative to current position
-  stepperLeft.moveTo(0);//move one full rotation backward relative to current position
-  stepperRight.setSpeed(1000);//set right motor speed
-  stepperLeft.setSpeed(1000);//set left motor speed
-  stepperRight.runSpeedToPosition();//move right motor
-  stepperLeft.runSpeedToPosition();//move left motor
-  runToStop();//run until the robot reaches the target
-  delay(1000); // One second delay
-}
-
-/*
-   The move3() function will use the MultiStepper() class to move both motors at once
-   move() is a library function for relative movement to set a target position
-   moveTo() is a library function for absolute movement to set a target position
-   stop() is a library function that causes the stepper to stop as quickly as possible
-   run() is a library function that uses accel and decel to achieve target position, no blocking
-   runSpeed() is a library function that uses constant speed to achieve target position, no blocking
-   runToPosition() is a library function that uses blocking with accel/decel to achieve target position
-   runSpeedToPosition() is a library function that uses constant speed to achieve target posiiton, no blocking
-   runToNewPosition() is a library function that uses blocking with accel/decel to achieve target posiiton
-*/
-void move3() {
-  Serial.println("move3 function");
-  digitalWrite(redLED, LOW);//turn off red LED
-  digitalWrite(grnLED, LOW);//turn off green LED
-  digitalWrite(ylwLED, HIGH);//turn on yellow LED
-  long positions[2]; // Array of desired stepper positions
-  positions[0] = 800;//right motor absolute position
-  positions[1] = 800;//left motor absolute position
-  steppers.moveTo(positions);
-  steppers.runSpeedToPosition(); // Blocks until all are in position
-  delay(1000);//wait one second
-  // Move to a different coordinate
-  positions[0] = 0;//right motor absolute position
-  positions[1] = 0;//left motor absolute position
-  steppers.moveTo(positions);
-  steppers.runSpeedToPosition(); // Blocks until all are in position
-  delay(1000);//wait one second
-}
-
-/*this function will move to target at 2 different speeds - absolute position*/
-void move4() {
-
-  Serial.println("move4 function");
-  int leftPos = 5000;//right motor absolute position
-  int rightPos = 1000;//left motor absolute position
-  int leftSpd = 1000;//right motor speed
-  int rightSpd = 200; //left motor speed
-
-  digitalWrite(redLED, HIGH);//turn on red LED
-  digitalWrite(grnLED, HIGH);//turn on green LED
-  digitalWrite(ylwLED, LOW);//turn off yellow LED
-
-  stepperLeft.moveTo(leftPos);//left motor absolute position
-  stepperRight.moveTo(rightPos);//right motor absolute position
-  stepperLeft.setSpeed(leftSpd);
-  stepperRight.setSpeed(rightSpd);
-  steppers.runSpeedToPosition(); // Blocks until all are in position
-
-  stepperLeft.setCurrentPosition(0);
-  stepperRight.setCurrentPosition(0);
-
-}
-
-/*This function will move continuously at 2 different speeds*/
-void move5() {
-  Serial.println("move5 function");
-  digitalWrite(redLED, LOW);//turn off red LED
-  digitalWrite(grnLED, HIGH);//turn on green LED
-  digitalWrite(ylwLED, HIGH);//turn on yellow LED
-
-  int leftSpd = 1000;//right motor speed
-  int rightSpd = 200; //left motor speed
-
-  stepperLeft.setSpeed(leftSpd);//set left motor speed
-  stepperRight.setSpeed(rightSpd);//set right motor speed
-
-  while(true){
-      runAtSpeed();
-  }
-}
-
-
-/*this function will move to target at 2 different speeds - relative position*/
-void move6() {
-
-  Serial.println("move6 function");
-  int leftPos = 5000;//right motor absolute position
-  int rightPos = 1000;//left motor absolute position
-  int leftSpd = 1000;//right motor speed
-  int rightSpd = 200; //left motor speed
-
-  digitalWrite(redLED, HIGH);//turn on red LED
-  digitalWrite(grnLED, HIGH);//turn on green LED
-  digitalWrite(ylwLED, HIGH);//turn off yellow LED
-
-  //Unomment the next 2 lines for relative movement
-  stepperLeft.move(leftPos);//move left wheel to relative position
-  stepperRight.move(rightPos);//move right wheel to relative position
-
-  stepperLeft.setSpeed(leftSpd);//set left motor speed
-  stepperRight.setSpeed(rightSpd);//set right motor speed
-
-  steppers.runSpeedToPosition(); // Blocks until all are in position
-}
-
-
-
 /*
   Robot pivot on one wheel. left wheel is 0 and right wheel is 1. degree can be both positive and negative
 */
@@ -398,6 +228,7 @@ void pivot(bool wheel, int degree, int speed) {
   int dis = degree * 3.14 * wheel_base / 180;
   int signOfDegree = constrain(degree, -1, 1);
   int steps = dis_to_step(dis) + offset;
+  Serial.println("Pivot Steps: ");
   Serial.println(steps);
   if (!wheel){
 	  stepperRight.moveTo(steps);
@@ -427,6 +258,7 @@ void spin(int degree, int speed) {
   int signOfDegree = constrain(degree, -1, 1);
   int dis = degree * 3.14 * wheel_base / (2*180);
   int steps = dis_to_step(dis) + offset;
+  Serial.println("Spin Steps:");
   Serial.println(steps);
   stepperRight.moveTo(steps);
   stepperLeft.moveTo(-steps);
@@ -468,6 +300,8 @@ void turn(int degree, int radius, int speed) {
 */
 void forward(int distance, int speed) {
   int steps = dis_to_step(distance);
+  Serial.println("Forward Steps: ");
+  Serial.println(steps);
   stepperRight.moveTo(steps);
   stepperLeft.moveTo(steps);
   stepperRight.setSpeed(speed);
@@ -479,10 +313,12 @@ void forward(int distance, int speed) {
   stepperRight.setCurrentPosition(0);
 }
 /*
-  go backward for certain distance (cm) with certain speed
+  go backward for certain distance (cm) with certain speed (0-1000, 300 ideal)
 */
 void reverse(int distance, int speed) {
   int steps = dis_to_step(distance);
+  Serial.println("Backward Steps: ");
+  Serial.println(steps);
   stepperRight.moveTo(-steps);
   stepperLeft.moveTo(-steps);
   stepperRight.setSpeed(-speed);
@@ -531,12 +367,7 @@ void moveSquare(int length){
     spin(90, 350);
     delay(250);
   }
-  
-
 }
-
-
-
 
 /*
   run in a circle. diam (cm): left of robot is negative, right is positive
@@ -554,6 +385,21 @@ void moveFigure8(int diam) {
   turn(360, -diam/2, 800);
 }
 
+/*
+  Move the robot wheels a part of a rotation by steps (0-800) w/ speed (0-1000, ideal 300, negative to reverse)
+*/
+void moveRotation(int steps, int speed) {
+  stepperRight.moveTo(steps);
+  stepperLeft.moveTo(steps);
+  stepperRight.setSpeed(speed);
+  stepperLeft.setSpeed(speed);
+  stepperRight.runSpeedToPosition();
+  stepperLeft.runSpeedToPosition();
+  runToStop();
+  stepperLeft.setCurrentPosition(0);
+  stepperRight.setCurrentPosition(0);
+}
+
 
 //// MAIN
 void setup()
@@ -567,54 +413,22 @@ void setup()
 
   Serial.begin(baudrate);     //start serial monitor communication
   Serial.println("Robot starting...Put ON TEST STAND");
-  delay(init_time); //always wait 5 seconds before the robot moves
-
-  //GoToGoal(122, 244);
-  //forward(200, 300);
-  moveCircle(61, 400);
-  delay(1000);
-  moveFigure8(61);
-  delay(1000);
-  moveSqu
-  
-  
-
+  delay(pauseTime); //always wait 2.5 seconds before the robot moves
 }
 
 void loop()
 {
+  forward(61, 200);
+  delay(wait_time/2);
+  reverse(61, 200);
+  delay(wait_time/2);
+  spin(90, 100);
+  delay(wait_time/2);
+  spin(-90, 100);
+  delay(wait_time/2);
+  pivot(0, 90, 100);
+  delay(wait_time/2);
+  pivot(1, 90, 100);
 
-
-  //Uncomment to read Encoder Data (uncomment to read on serial monitor)
-  //print_encoder_data();   //prints encoder data
-
-  
-
-  delay(wait_time);               //wait to move robot or read data
-}
-
-void Lab_1_demo(){
-  forward(50, 400);
-  delay(1000);
-  reverse(50, 700);
-  delay(1000);
-  pivot(0, 135, 400);
-  delay(1000);
-  pivot(1, 135, 400);
-  delay(1000);
-  pivot(1, -90, 400);
-  delay(1000);
-  pivot(0, -90, 400);
-  delay(1000);
-  turn(90, 40, 800);
-  delay(1000);
-  turn(90,-40, 800);
-  delay(1000);
-  spin(270, 400);
-  delay(1000);
-  spin(-270, 400);
-  delay(1000);
-  moveCircle(80, 800);
-  delay(1000);
-  moveFigure8(80);
+  delay(wait_time);
 }
