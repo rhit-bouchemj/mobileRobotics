@@ -267,14 +267,14 @@ void spin(int degree, int speed) {
   }
   int signOfDegree = constrain(degree, -1, 1);
   int dis = degree * 3.14 * wheel_base / (2 * 180);
-  int steps = dis_to_step(dis) + offset;
+  int steps = dis_to_step(dis); //+ offset;
   Serial.println("Degrees:");
   Serial.println(degree);
   Serial.println(steps);
   stepperRight.moveTo(steps);
   stepperLeft.moveTo(-steps);
-  stepperRight.setSpeed(speed);
-  stepperLeft.setSpeed(speed);
+  stepperRight.setMaxSpeed(speed);
+  stepperLeft.setMaxSpeed(speed);
   steppers.runSpeedToPosition();
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
@@ -415,6 +415,38 @@ void randomWander() {
   allOFF();  //turn off all LEDs
 }
 
+void randomWanderNoSpin(){
+  allOFF();
+  digitalWrite(grnLED, HIGH);  //turn on green LED
+
+  int maxVal = 6000;                  //maximum value for random number
+  randomSeed(analogRead(0));    //generate a new random number each time called
+  while(1){
+    if(stepperLeft.distanceToGo() == 0){      
+      int randomSteps = random(maxVal) + 5;
+      int randomMaxSpeed = random(maxVal) % 400 + 250;
+      int randomAcc = random(maxVal) % 200 + 150;
+      Serial.println("steps:");
+      Serial.println(randomSteps);
+      Serial.println("speed:");
+      Serial.println(randomMaxSpeed);
+      stepperLeft.moveTo(randomSteps);
+      stepperLeft.setMaxSpeed(randomMaxSpeed);
+      stepperLeft.setAcceleration(randomAcc);
+    }
+    if(stepperRight.distanceToGo() == 0){      
+      int randomSteps = random(maxVal) + 5;
+      int randomMaxSpeed = random(maxVal) % 400 + 250;
+      int randomAcc = random(maxVal) % 200 + 150;
+      stepperRight.moveTo(randomSteps);
+      stepperRight.setMaxSpeed(randomMaxSpeed);
+      stepperRight.setAcceleration(randomAcc);
+    }
+    stepperLeft.run();
+    stepperRight.run();
+  }
+}
+
 /*
 
 */
@@ -438,6 +470,7 @@ void collide() {
 
 //// MAIN
 void setup() {
+  delay(2000);
   int baudrate = 9600;  //serial monitor baud rate'
   init_stepper();       //set up stepper motor
 
@@ -448,7 +481,10 @@ void setup() {
   Serial.begin(baudrate);  //start serial monitor communication
   Serial.println("Robot starting...Put ON TEST STAND");
   delay(init_time);  //always wait 5 seconds before the robot moves
-  randomWander();
+  //randomWander();
+  randomWanderNoSpin();
+  //GoToAngle(450);
+  
 }
 
 void loop() {
@@ -459,5 +495,5 @@ void loop() {
 
 
 
-  delay(wait_time);  //wait to move robot or read data
+  //delay(wait_time);  //wait to move robot or read data
 }
