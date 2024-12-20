@@ -451,7 +451,10 @@ void randomWanderNoSpin(){
 
 */
 void runAway() {
+  allOFF();
+  ylwOn();
 
+  allOFF();
 }
 
 /*
@@ -459,9 +462,13 @@ void runAway() {
 void collide() {
   allOFF(); //Turn off all LEDs
   redOn();  //Turn on red LED
-  // while(sensor != close) {
-
-  // }
+  while(sensor != close) {
+    if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0)
+    {
+      prepForward(30, 300); //Prepare to move forward 30cm (1') at speed 300
+    }
+    steppers.run();
+  }
 
   allOFF(); //Turn off all LEDs
 }
