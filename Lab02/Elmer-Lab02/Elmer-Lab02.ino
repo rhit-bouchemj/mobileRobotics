@@ -36,14 +36,13 @@
   digital pin 18 - left encoder pin
   digital pin 19 - right encoder pin
 
-  digital pin ## - left sonor pin
-  digital pin ## - right sonor pin
+  digital pin 4 - left sonor pin
+  digital pin 3 - right sonor pin
 
-  digital pin ## - front infared pin
-  digital pin ## - back infared pin
-  digital pin ## - left infared pin
-  digital pin ## - right infared pin
-  ^^ LIDAR????
+  digital pin 8 - front infared pin
+  digital pin 9 - back infared pin
+  digital pin 10 - left infared pin
+  digital pin 11 - right infared pin
 
 
   VV Keep?
@@ -76,9 +75,15 @@ int leds[3] = { 5, 6, 7 };  //array of LED pin numbers
 #define ltDirPin 53       //left stepper motor direction pin
 
 //define sonar pin numbers
-
+#define lf_sonar 4
+#define rt_sonar 3
 
 //define infared and lidar sensors
+#define ft_lidar 8
+#define bk_lidar 9
+#define lf_lidar 10
+#define rt_lidar 11
+
 
 AccelStepper stepperRight(AccelStepper::DRIVER, rtStepPin, rtDirPin);  //create instance of right stepper motor object (2 driver pins, low to high transition step pin 52, direction input pin 53 (high means forward)
 AccelStepper stepperLeft(AccelStepper::DRIVER, ltStepPin, ltDirPin);   //create instance of left stepper motor object (2 driver pins, step pin 50, direction input pin 51)
@@ -448,11 +453,30 @@ void randomWanderNoSpin(){
 }
 
 /*
+*/
+void follow() {
+  allOFF(); //Turn off all LEDs
+  ylwOn(); //Turn on yellow LED
+  grnOn(); //Turn on green LED
+
+  allOFF(); //Turn off all LEDs
+}
+
+
+/*
 
 */
 void runAway() {
   allOFF();
   ylwOn();
+  while(sensor != close && lidar != close) {} //Move forward while not sensing wall
+  
+  //Calculate feel force
+  //Spin based on feel force vector
+  //Move proportional to feel vector
+
+  spin(180);
+
 
   allOFF();
 }
@@ -462,18 +486,25 @@ void runAway() {
 void collide() {
   allOFF(); //Turn off all LEDs
   redOn();  //Turn on red LED
-  while(sensor != close) {
+  while(sensor != close) { //Move forward while not sensing wall
     if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0)
     {
       prepForward(30, 300); //Prepare to move forward 30cm (1') at speed 300
     }
     steppers.run();
   }
-
+  steppers.stop();
   allOFF(); //Turn off all LEDs
 }
 
+//Sensor checks
+void checkLidar() {
 
+}
+
+void checkSonar() {
+
+}
 
 //// MAIN
 void setup() {
