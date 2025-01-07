@@ -376,18 +376,6 @@ void GoToGoal(long x, long y) {
 /*
 
 */
-void prepForward(int distance, int speed) {
-  stepperLeft.setCurrentPosition(0);
-  stepperRight.setCurrentPosition(0);
-  int steps = dis_to_step(distance);
-  stepperRight.moveTo(steps);
-  stepperLeft.moveTo(steps);
-  Serial.println("Steps: ");
-  Serial.println(steps);
-  stepperRight.setSpeed(speed);
-  stepperLeft.setSpeed(speed);
-}
-
 
 
 /*
@@ -420,14 +408,8 @@ void prepForward(int distance, int speed) {
 //   allOFF();  //turn off all LEDs
 // }
 
-void randomWanderNoSpin(){
-  allOFF();
-  digitalWrite(grnLED, HIGH);  //turn on green LED
-
-  int maxVal = 6000;                  //maximum value for random number
-  randomSeed(analogRead(0));    //generate a new random number each time called
-  while(1){
-    if(stepperLeft.distanceToGo() == 0){      
+void prepMovement(int maxVal) {
+  if(stepperLeft.distanceToGo() == 0){      
       int randomSteps = random(maxVal) + 5;
       int randomMaxSpeed = random(maxVal) % 400 + 250;
       int randomAcc = random(maxVal) % 200 + 150;
@@ -442,20 +424,28 @@ void randomWanderNoSpin(){
       stepperRight.moveTo(randomSteps);
       stepperRight.setMaxSpeed(randomMaxSpeed);
       stepperRight.setAcceleration(randomAcc);
+  }
+}
+
+void randomWanderNoSpin(){
+  allOFF();
+  grnOn();  //turnx on green LED
+
+  int maxVal = 6000;                  //maximum value for random number
+  randomSeed(analogRead(0));    //generate a new random number each time called
+  while(1){
+    prepMovement(maxVal);
     }
     stepperLeft.run();
     stepperRight.run();
-  }
 }
 
 /*
 */
 void follow() {
   allOFF(); //Turn off all LEDs
-  ylwOn(); //Turn on yellow LED
-  grnOn(); //Turn on green LED
-
   collide();
+  redOff();
   while(sensor == detectObject)
   {
     if(sensor > desiredDistance) {
@@ -468,8 +458,6 @@ void follow() {
     //
 
   }
-
-
   allOFF(); //Turn off all LEDs
 }
 
@@ -480,42 +468,31 @@ void follow() {
 void runAway() {
   allOFF();
   ylwOn();
-  while(sensor != close && lidar != close) {} //Move forward while not sensing wall
-  
+  int prop = 1;   //Linear proportional controller of distance moved
+  while(1) {//sensor != close && lidar != close) {} //Move forward while not sensing wall
   //Calculate feel force
-  //Spin based on feel force vector
-  //Move proportional to feel vector
-
-  spin(180);
-
-
+  xSens = fSense - bSense;  //total X sensor = front - back
+  ySens = lSense - rSense;  //total Y sensor = left - right <-- Based on directions listed in lab 1
+  goToGoal(-xSens*prop, -ySens*prop); //Go to a proportionalDistance in the opposite direction as sensed
+  }
   allOFF();
+  // TODO: How to unstuck???
 }
 
 /*
 */
 void collide() {
   allOFF(); //Turn off all LEDs
-  redOn();  //Turn on red LED
-  while(sensor != close) { //Move forward while not sensing wall
-    if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0)
-    {
-      prepForward(30, 300); //Prepare to move forward 30cm (1') at speed 300
-    }
-    steppers.run();
+  maxValue = 6000;
+  while(1) {//sensor != close) { //Move forward while not sensing wall
+    grnOn();  //Turn on red LED
+    prepMovement(maxValue); //Prepare to move forward 30cm (1') at speed 300
+    stepperLeft.run();
+    stepperRight.run();
   }
-  steppers.stop();
-  allOFF(); //Turn off all LEDs
+  redOn();
 }
 
-//Sensor checks
-void checkLidar() {
-
-}
-
-void checkSonar() {
-
-}
 
 //// MAIN
 void setup() {
@@ -530,19 +507,15 @@ void setup() {
   Serial.begin(baudrate);  //start serial monitor communication
   Serial.println("Robot starting...Put ON TEST STAND");
   delay(init_time);  //always wait 5 seconds before the robot moves
-  //randomWander();
-  randomWanderNoSpin();
-  //GoToAngle(450);
   
 }
 
 void loop() {
 
-  // randomWanderNoSpin();
+  collide();  
+
   //Uncomment to read Encoder Data (uncomment to read on serial monitor)
   //print_encoder_data();   //prints encoder data
-
-
 
   //delay(wait_time);  //wait to move robot or read data
 }
