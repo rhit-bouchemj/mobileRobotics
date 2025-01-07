@@ -371,6 +371,11 @@ void GoToGoal(long x, long y) {
 
 //Lab 2 commands
 
+
+//Helper Commands
+/*
+
+*/
 void prepForward(int distance, int speed) {
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
@@ -384,41 +389,36 @@ void prepForward(int distance, int speed) {
 }
 
 
-void randomMovement(int randomNumber) {
-  GoToAngle(randomNumber % 360 - 180);
-  Serial.println("Past Angle");
-  prepForward(randomNumber % 40 + 1, randomNumber % 400 + 100);
-}
 
 /*
   The robot will move randomly repeatedly, changing its angle and driving forward a random distance (unless it detects an object too close)
 */
-void randomWander() {
-  allOFF();                   //turn off all LEDs
-  digitalWrite(grnLED, HIGH);  //turn on green LED
+// void randomWander() {
+//   allOFF();                   //turn off all LEDs
+//   digitalWrite(grnLED, HIGH);  //turn on green LED
 
-  int maxVal = 1000;                  //maximum value for random number
-  randomSeed(analogRead(0));    //generate a new random number each time called
-  int randomNumber;  //generate a random number up to the maximum value
+//   int maxVal = 1000;                  //maximum value for random number
+//   randomSeed(analogRead(0));    //generate a new random number each time called
+//   int randomNumber;  //generate a random number up to the maximum value
   
-  while(1) //Bigger loop that continues to randomize the movement // TODO: add "!close" (continue random movement till wall)
-  {
-    if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0) 
-    {
-      randomNumber = random(maxVal);  //generate a random number up to the maximum value
-      Serial.println("Randomize: ");
-      Serial.println(randomNumber);
-      delay(1000);
-      randomMovement(randomNumber);
-    }
-    stepperRight.run();  //Robot begins moving
-    stepperLeft.run(); 
-    Serial.print("running");
-  }
-  stepperLeft.stop(); //Stop robot after completing distance
-  stepperRight.stop();
-  allOFF();  //turn off all LEDs
-}
+//   while(1) //Bigger loop that continues to randomize the movement // TODO: add "!close" (continue random movement till wall)
+//   {
+//     if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0) 
+//     {
+//       randomNumber = random(maxVal);  //generate a random number up to the maximum value
+//       Serial.println("Randomize: ");
+//       Serial.println(randomNumber);
+//       delay(1000);
+//       randomMovement(randomNumber);
+//     }
+//     stepperRight.run();  //Robot begins moving
+//     stepperLeft.run(); 
+//     Serial.print("running");
+//   }
+//   stepperLeft.stop(); //Stop robot after completing distance
+//   stepperRight.stop();
+//   allOFF();  //turn off all LEDs
+// }
 
 void randomWanderNoSpin(){
   allOFF();
@@ -431,10 +431,6 @@ void randomWanderNoSpin(){
       int randomSteps = random(maxVal) + 5;
       int randomMaxSpeed = random(maxVal) % 400 + 250;
       int randomAcc = random(maxVal) % 200 + 150;
-      Serial.println("steps:");
-      Serial.println(randomSteps);
-      Serial.println("speed:");
-      Serial.println(randomMaxSpeed);
       stepperLeft.moveTo(randomSteps);
       stepperLeft.setMaxSpeed(randomMaxSpeed);
       stepperLeft.setAcceleration(randomAcc);
@@ -458,6 +454,21 @@ void follow() {
   allOFF(); //Turn off all LEDs
   ylwOn(); //Turn on yellow LED
   grnOn(); //Turn on green LED
+
+  collide();
+  while(sensor == detectObject)
+  {
+    if(sensor > desiredDistance) {
+      //Calculate vector of object
+      //Calculate motor speed
+      //Controller to control independent motors
+
+    
+    }
+    //
+
+  }
+
 
   allOFF(); //Turn off all LEDs
 }
@@ -527,7 +538,7 @@ void setup() {
 
 void loop() {
 
-
+  // randomWanderNoSpin();
   //Uncomment to read Encoder Data (uncomment to read on serial monitor)
   //print_encoder_data();   //prints encoder data
 
