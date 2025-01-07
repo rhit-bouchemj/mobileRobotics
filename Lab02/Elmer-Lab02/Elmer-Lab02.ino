@@ -36,14 +36,13 @@
   digital pin 18 - left encoder pin
   digital pin 19 - right encoder pin
 
-  digital pin ## - left sonor pin
-  digital pin ## - right sonor pin
+  digital pin 4 - left sonor pin
+  digital pin 3 - right sonor pin
 
-  digital pin ## - front infared pin
-  digital pin ## - back infared pin
-  digital pin ## - left infared pin
-  digital pin ## - right infared pin
-  ^^ LIDAR????
+  digital pin 8 - front infared pin
+  digital pin 9 - back infared pin
+  digital pin 10 - left infared pin
+  digital pin 11 - right infared pin
 
 
   VV Keep?
@@ -76,9 +75,15 @@ int leds[3] = { 5, 6, 7 };  //array of LED pin numbers
 #define ltDirPin 53       //left stepper motor direction pin
 
 //define sonar pin numbers
-
+#define lf_sonar 4
+#define rt_sonar 3
 
 //define infared and lidar sensors
+#define ft_lidar 8
+#define bk_lidar 9
+#define lf_lidar 10
+#define rt_lidar 11
+
 
 AccelStepper stepperRight(AccelStepper::DRIVER, rtStepPin, rtDirPin);  //create instance of right stepper motor object (2 driver pins, low to high transition step pin 52, direction input pin 53 (high means forward)
 AccelStepper stepperLeft(AccelStepper::DRIVER, ltStepPin, ltDirPin);   //create instance of left stepper motor object (2 driver pins, step pin 50, direction input pin 51)
@@ -366,6 +371,11 @@ void GoToGoal(long x, long y) {
 
 //Lab 2 commands
 
+
+//Helper Commands
+/*
+
+*/
 void prepForward(int distance, int speed) {
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
@@ -379,41 +389,36 @@ void prepForward(int distance, int speed) {
 }
 
 
-void randomMovement(int randomNumber) {
-  GoToAngle(randomNumber % 360 - 180);
-  Serial.println("Past Angle");
-  prepForward(randomNumber % 40 + 1, randomNumber % 400 + 100);
-}
 
 /*
   The robot will move randomly repeatedly, changing its angle and driving forward a random distance (unless it detects an object too close)
 */
-void randomWander() {
-  allOFF();                   //turn off all LEDs
-  digitalWrite(grnLED, HIGH);  //turn on green LED
+// void randomWander() {
+//   allOFF();                   //turn off all LEDs
+//   digitalWrite(grnLED, HIGH);  //turn on green LED
 
-  int maxVal = 1000;                  //maximum value for random number
-  randomSeed(analogRead(0));    //generate a new random number each time called
-  int randomNumber;  //generate a random number up to the maximum value
+//   int maxVal = 1000;                  //maximum value for random number
+//   randomSeed(analogRead(0));    //generate a new random number each time called
+//   int randomNumber;  //generate a random number up to the maximum value
   
-  while(1) //Bigger loop that continues to randomize the movement // TODO: add "!close" (continue random movement till wall)
-  {
-    if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0) 
-    {
-      randomNumber = random(maxVal);  //generate a random number up to the maximum value
-      Serial.println("Randomize: ");
-      Serial.println(randomNumber);
-      delay(1000);
-      randomMovement(randomNumber);
-    }
-    stepperRight.run();  //Robot begins moving
-    stepperLeft.run(); 
-    Serial.print("running");
-  }
-  stepperLeft.stop(); //Stop robot after completing distance
-  stepperRight.stop();
-  allOFF();  //turn off all LEDs
-}
+//   while(1) //Bigger loop that continues to randomize the movement // TODO: add "!close" (continue random movement till wall)
+//   {
+//     if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0) 
+//     {
+//       randomNumber = random(maxVal);  //generate a random number up to the maximum value
+//       Serial.println("Randomize: ");
+//       Serial.println(randomNumber);
+//       delay(1000);
+//       randomMovement(randomNumber);
+//     }
+//     stepperRight.run();  //Robot begins moving
+//     stepperLeft.run(); 
+//     Serial.print("running");
+//   }
+//   stepperLeft.stop(); //Stop robot after completing distance
+//   stepperRight.stop();
+//   allOFF();  //turn off all LEDs
+// }
 
 void randomWanderNoSpin(){
   allOFF();
@@ -426,10 +431,6 @@ void randomWanderNoSpin(){
       int randomSteps = random(maxVal) + 5;
       int randomMaxSpeed = random(maxVal) % 400 + 250;
       int randomAcc = random(maxVal) % 200 + 150;
-      Serial.println("steps:");
-      Serial.println(randomSteps);
-      Serial.println("speed:");
-      Serial.println(randomMaxSpeed);
       stepperLeft.moveTo(randomSteps);
       stepperLeft.setMaxSpeed(randomMaxSpeed);
       stepperLeft.setAcceleration(randomAcc);
@@ -448,10 +449,47 @@ void randomWanderNoSpin(){
 }
 
 /*
+*/
+void follow() {
+  allOFF(); //Turn off all LEDs
+  ylwOn(); //Turn on yellow LED
+  grnOn(); //Turn on green LED
+
+  collide();
+  while(sensor == detectObject)
+  {
+    if(sensor > desiredDistance) {
+      //Calculate vector of object
+      //Calculate motor speed
+      //Controller to control independent motors
+
+    
+    }
+    //
+
+  }
+
+
+  allOFF(); //Turn off all LEDs
+}
+
+
+/*
 
 */
 void runAway() {
+  allOFF();
+  ylwOn();
+  while(sensor != close && lidar != close) {} //Move forward while not sensing wall
+  
+  //Calculate feel force
+  //Spin based on feel force vector
+  //Move proportional to feel vector
 
+  spin(180);
+
+
+  allOFF();
 }
 
 /*
@@ -459,14 +497,25 @@ void runAway() {
 void collide() {
   allOFF(); //Turn off all LEDs
   redOn();  //Turn on red LED
-  // while(sensor != close) {
-
-  // }
-
+  while(sensor != close) { //Move forward while not sensing wall
+    if(stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0)
+    {
+      prepForward(30, 300); //Prepare to move forward 30cm (1') at speed 300
+    }
+    steppers.run();
+  }
+  steppers.stop();
   allOFF(); //Turn off all LEDs
 }
 
+//Sensor checks
+void checkLidar() {
 
+}
+
+void checkSonar() {
+
+}
 
 //// MAIN
 void setup() {
@@ -489,7 +538,7 @@ void setup() {
 
 void loop() {
 
-
+  // randomWanderNoSpin();
   //Uncomment to read Encoder Data (uncomment to read on serial monitor)
   //print_encoder_data();   //prints encoder data
 
