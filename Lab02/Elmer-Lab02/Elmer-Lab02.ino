@@ -408,6 +408,10 @@ void GoToGoal(long x, long y) {
 //   allOFF();  //turn off all LEDs
 // }
 
+/*
+  Prepare movement step (such as number of steps, max speed, and acceleration)
+  the movement parameters are random between wheels, resulting in random movement
+*/
 void prepMovement(int maxVal) {
   if(stepperLeft.distanceToGo() == 0){      
       int randomSteps = random(maxVal) + 5;
@@ -427,37 +431,59 @@ void prepMovement(int maxVal) {
   }
 }
 
+/*
+  Prepare movement step (such as numberof steps, max speed, and acceleration)
+  the movement parameters will be equal for both wheels resulting in forward movement
+*/
+void prepForward(int maxVal) {
+  if(stepperLeft.distanceToGo() == 0){      
+      int randomSteps = random(maxVal) + 5;
+      int randomMaxSpeed = random(maxVal) % 400 + 250;
+      int randomAcc = random(maxVal) % 200 + 150;
+      stepperLeft.moveTo(randomSteps);
+      stepperLeft.setMaxSpeed(randomMaxSpeed);
+      stepperLeft.setAcceleration(randomAcc);
+      stepperRight.moveTo(randomSteps);
+      stepperRight.setMaxSpeed(randomMaxSpeed);
+      stepperRight.setAcceleration(randomAcc);
+  }
+}
+
+/*
+  Randomly move the robot, for evey call made the robot will increment a step. If the robot has reached its correct position the robot will randomise again. 
+*/
 void randomWanderNoSpin(){
   allOFF();
   grnOn();  //turnx on green LED
 
   int maxVal = 6000;                  //maximum value for random number
   randomSeed(analogRead(0));    //generate a new random number each time called
-  while(1){
-    prepMovement(maxVal);
-    }
-    stepperLeft.run();
-    stepperRight.run();
+  // while(1){
+  prepMovement(maxVal);
+  // }
+  stepperLeft.run();
+  stepperRight.run();
 }
 
 /*
 */
 void follow() {
   allOFF(); //Turn off all LEDs
-  collide();
-  redOff();
-  while(sensor == detectObject)
+  collide();    //drive forward until the robot collides with the object in front of it
+  redOFF();
+  while(data.front < 20)//sensor == detectObject) // while the robot can see the object
   {
-    if(sensor > desiredDistance) {
-      //Calculate vector of object
-      //Calculate motor speed
-      //Controller to control independent motors
-
+      
+    //Calculate vector of object
+    //Calculate motor speed
+    //Controller to control independent motors
     
-    }
-    //
+    //P controller: Kc*e(t) + b
+    //e(t) = error from sensor
+    //e(t) = frontSense - desired distance / desired distance (percent error)
 
   }
+  //TODO: decide what to do when no longer seeing the object (random wander or stop?)
   allOFF(); //Turn off all LEDs
 }
 
@@ -469,11 +495,11 @@ void runAway() {
   allOFF();
   ylwOn();
   int prop = 1;   //Linear proportional controller of distance moved
-  while(1) {//sensor != close && lidar != close) {} //Move forward while not sensing wall
-  //Calculate feel force
-  xSens = fSense - bSense;  //total X sensor = front - back
-  ySens = lSense - rSense;  //total Y sensor = left - right <-- Based on directions listed in lab 1
-  goToGoal(-xSens*prop, -ySens*prop); //Go to a proportionalDistance in the opposite direction as sensed
+  while(data.front > 20) {//sensor != close && lidar != close) {} //Move forward while not sensing wall
+    //Calculate feel force
+    xSens = data.front - data.back;  //total X sensor = front - back
+    ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
+    goToGoal(-xSens*prop, -ySens*prop); //Go to a proportionalDistance in the opposite direction as sensed
   }
   allOFF();
   // TODO: How to unstuck???
@@ -484,13 +510,13 @@ void runAway() {
 void collide() {
   allOFF(); //Turn off all LEDs
   maxValue = 6000;
-  while(1) {//sensor != close) { //Move forward while not sensing wall
-    grnOn();  //Turn on red LED
-    prepMovement(maxValue); //Prepare to move forward 30cm (1') at speed 300
-    stepperLeft.run();
-    stepperRight.run();
+  while(data.front > 20) {//sensor != close) { //Move forward while not sensing wall
+    grnOn();  //Turn on green LED
+    prepMovement(maxValue); //prepare to move forward
+    stepperLeft.run();    //increment left motor
+    stepperRight.run();   //increment right motor
   }
-  redOn();
+  redOn();    //turn on red LED
 }
 
 
@@ -512,7 +538,7 @@ void setup() {
 
 void loop() {
 
-  collide();  
+  randomWanderNoSpin();  
 
   //Uncomment to read Encoder Data (uncomment to read on serial monitor)
   //print_encoder_data();   //prints encoder data
