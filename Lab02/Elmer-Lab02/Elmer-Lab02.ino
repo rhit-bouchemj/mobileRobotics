@@ -112,6 +112,61 @@ int accumTicks[2] = { 0, 0 };         //variable to hold accumulated ticks since
 const float wheel_width = 8.5;  //diameter of the wheel (cm)
 const float wheel_base = 22;    //length between the two wheel's center (cm)
 
+// a struct to hold lidar data
+struct lidar {
+  // this can easily be extended to contain sonar data as well
+  int front;
+  int back;
+  int left;
+  int right;
+  // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
+  MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
+} dist;
+
+
+// a struct to hold lidar data
+struct sonar {
+  // this can easily be extended to contain sonar data as well
+  int left;
+  int right;
+  // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
+  MSGPACK_DEFINE_ARRAY(left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
+} dist2;
+
+// read_lidars is the function used to get lidar data to the M7
+struct lidar read_lidars() {
+  return dist;
+}
+
+// read_lidars is the function used to get lidar data to the M7
+struct sonar read_sonars() {
+  return dist2;
+}
+// reads a lidar given a pin
+int read_lidar(int pin) {
+  int d;
+  int16_t t = pulseIn(pin, HIGH);
+  d = (t - 1000) * 3 / 40;
+  if (t == 0 || t > 1850 || d < 0) { d = 0; }
+  return d;
+}
+
+// reads a sonar given a pin
+int read_sonar(int pin) {
+  float velocity ((331.5 + 0.6 * (float)(20)) * 100 / 1000000.0);
+  uint16_t distance, pulseWidthUs;
+
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, LOW);
+  digitalWrite(pin, HIGH);            //Set the trig pin High
+  delayMicroseconds(10);              //Delay of 10 microseconds
+  digitalWrite(pin, LOW);             //Set the trig pin Low
+  pinMode(pin, INPUT);                //Set the pin to input mode
+  pulseWidthUs = pulseIn(pin, HIGH);  //Detect the high level time on the echo pin, the output high level time represents the ultrasonic flight time (unit: us)
+  distance = pulseWidthUs * velocity / 2.0;
+  if (distance < 0 || distance > 50) { distance = 0; }
+  return distance;
+}
 // Helper Functions
 
 //convert travel distance (cm) to steps
@@ -537,6 +592,23 @@ void setup() {
 }
 
 void loop() {
+  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  struct sonar data2 = RPC.call("read_sonars").as<struct sonar>();
+  // print lidar data
+  Serial.print("lidar: ");
+  Serial.print(data.front);
+  Serial.print(", ");
+  Serial.print(data.back);
+  Serial.print(", ");
+  Serial.print(data.left);
+  Serial.print(", ");
+  Serial.print(data.right);
+  Serial.println();
+  Serial.print("sonar: ");
+  Serial.print(data2.left);
+  Serial.print(", ");
+  Serial.print(data2.right);
+  Serial.println();
 
   randomWanderNoSpin();  
 
