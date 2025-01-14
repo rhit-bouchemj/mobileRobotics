@@ -169,6 +169,8 @@ int read_sonar(int pin) {
 }
 // Helper Functions
 
+//TODO: Delete placeholder variables
+
 //convert travel distance (cm) to steps
 int dis_to_step(int dis) {
   int step = dis * 360 / (3.14 * wheel_width * 0.45);
@@ -185,7 +187,7 @@ void RwheelSpeed() {
   encoder[RIGHT]++;  //count the right wheel encoder interrupts
 }
 
-void allOFF() {
+void allOff() {
   for (int i = 0; i < 3; i++) {
     digitalWrite(leds[i], LOW);
   }
@@ -199,6 +201,16 @@ void grnOn() {
 }
 void ylwOn() {
   digitalWrite(ylwLED, HIGH);
+}
+
+void redOff() {
+  digitalWrite(redLED, LOW);
+}
+void grnOff() {
+  digitalWrite(grnLED, LOW);
+}
+void ylwOff() {
+  digitalWrite(ylwLED, LOW);
 }
 
 
@@ -437,7 +449,7 @@ void GoToGoal(long x, long y) {
   The robot will move randomly repeatedly, changing its angle and driving forward a random distance (unless it detects an object too close)
 */
 // void randomWander() {
-//   allOFF();                   //turn off all LEDs
+//   allOff();                   //turn off all LEDs
 //   digitalWrite(grnLED, HIGH);  //turn on green LED
 
 //   int maxVal = 1000;                  //maximum value for random number
@@ -460,7 +472,7 @@ void GoToGoal(long x, long y) {
 //   }
 //   stepperLeft.stop(); //Stop robot after completing distance
 //   stepperRight.stop();
-//   allOFF();  //turn off all LEDs
+//   allOff();  //turn off all LEDs
 // }
 
 /*
@@ -508,7 +520,7 @@ void prepForward(int maxVal) {
   Randomly move the robot, for evey call made the robot will increment a step. If the robot has reached its correct position the robot will randomise again. 
 */
 void randomWanderNoSpin(){
-  allOFF();
+  allOff();
   grnOn();  //turnx on green LED
 
   int maxVal = 6000;                  //maximum value for random number
@@ -523,9 +535,9 @@ void randomWanderNoSpin(){
 /*
 */
 void follow() {
-  allOFF(); //Turn off all LEDs
+  allOff(); //Turn off all LEDs
   collide();    //drive forward until the robot collides with the object in front of it
-  redOFF();
+  redOff();
   while(data.front < 20)//sensor == detectObject) // while the robot can see the object
   {
       
@@ -539,7 +551,7 @@ void follow() {
 
   }
   //TODO: decide what to do when no longer seeing the object (random wander or stop?)
-  allOFF(); //Turn off all LEDs
+  allOff(); //Turn off all LEDs
 }
 
 
@@ -547,23 +559,23 @@ void follow() {
 
 */
 void runAway() {
-  allOFF();
+  allOff();
   ylwOn();
-  int prop = 1;   //Linear proportional controller of distance moved
+  int prop = 0.5;   //Linear proportional controller of distance moved
   while(data.front > 20) {//sensor != close && lidar != close) {} //Move forward while not sensing wall
     //Calculate feel force
-    xSens = data.front - data.back;  //total X sensor = front - back
-    ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
+    int xSens = data.front - data.back;  //total X sensor = front - back
+    int ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
     goToGoal(-xSens*prop, -ySens*prop); //Go to a proportionalDistance in the opposite direction as sensed
   }
-  allOFF();
+  allOff();
   // TODO: How to unstuck???
 }
 
 /*
 */
 void collide() {
-  allOFF(); //Turn off all LEDs
+  allOff(); //Turn off all LEDs
   maxValue = 6000;
   while(data.front > 20) {//sensor != close) { //Move forward while not sensing wall
     grnOn();  //Turn on green LED
