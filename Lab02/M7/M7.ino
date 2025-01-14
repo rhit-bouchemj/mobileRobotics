@@ -108,7 +108,7 @@ int read_sonar(int pin) {
 void read_sensors() {
   // read lidar data from struct
   struct lidar data = RPC.call("read_lidars").as<struct lidar>();
-  struct sonar data2 = RPC.call("read_sonars").as<struct sonar>();
+  // struct sonar data2 = RPC.call("read_sonars").as<struct sonar>();
   // print lidar data
   Serial.print("lidar: ");
   Serial.print(data.front);
@@ -120,6 +120,7 @@ void read_sensors() {
   Serial.println(data.right);
   Serial.println(" ");
 }
+
 void allOff() {
   for (int i = 0; i < 3; i++) {
     digitalWrite(leds[i], LOW);
@@ -390,23 +391,16 @@ void runAway() {
     } else {
       int xSens = data.front - data.back;  //total X sensor = front - back
       int ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
-      GoToGoal((constrain(xSens, -1, 1) * (-30) + xSens) * p, (constrain(ySens, -1, 1) * (-30) + ySens) * p);
-      /*
-      Serial.print("front: ");
-    Serial.print(data.front);
-    Serial.print("back: ");
-    Serial.print(data.back);
-    Serial.print("left: ");
-    Serial.print(data.left);
-    Serial.print("right: ");
-    Serial.println(data.right);
-    Serial.println(xSens);
-    Serial.println(ySens);
-    Serial.println(constrain(xSens, -1, 1) * (-30) + xSens);
-    Serial.println(constrain(ySens, -1, 1) * (-30) + ySens);
-    Serial.println("-----");
-    delay(500);
-    */
+      GoToGoal((constrain(xSens, -1, 1) * (-distThresh) + xSens) * p, (constrain(ySens, -1, 1) * (-distThresh) + ySens) * p);
+      
+      //Test sense data
+      // Serial.println(xSens);
+      // Serial.println(ySens);
+      // Serial.println(constrain(xSens, -1, 1) * (-30) + xSens);
+      // Serial.println(constrain(ySens, -1, 1) * (-30) + ySens);
+      // Serial.println("-----");
+      // delay(500);
+    
     }
   }
 }
@@ -420,27 +414,31 @@ void follow(int distance) {
     stepperLeft.setCurrentPosition(0);    //reset world position
     stepperRight.setCurrentPosition(0);
     int delta = data.front - distance;        // difference between intended distance and actual
-
-    stepperLeft.moveTo(constrain(delta, -1, 1)*5000);   // determine if moving forward or backword based on delta
-    stepperRight.moveTo(constrain(delta, -1, 1)*5000);
-    stepperLeft.setMaxSpeed(constrain(delta*100, -500, 500));   //change speed (base 100) by how far 
-    stepperRight.setMaxSpeed(constrain(delta*100, -500, 500));
-    stepperRight.setAcceleration(500);    //replace with non-magik numbers
-    stepperLeft.setAcceleration(500);
+    int sign = constrain(delta, -1, 1);
+    stepperLeft.moveTo(sign*5000);   // determine if moving forward or backword based on delta
+    stepperRight.moveTo(sign*5000);
+    stepperLeft.setSpeed(constrain(sign*sq(delta)*25, -700, 700));
+    stepperRight.setSpeed(constrain(sign*sq(delta)*25, -700, 700));
     stepperRight.run();
     stepperLeft.run();
 
     // Test Delta data
-    // Serial.print(constrain(delta, -1, 1)*5000);
-    // Serial.print("  ");
-    // Serial.print(delta);
-    // Serial.print("  ");
-    // Serial.println(data.front);
+    Serial.print(constrain(delta, -1, 1)*5000);
+    Serial.print("  ");
+    Serial.print(delta);
+    Serial.print("  ");
+    Serial.println(data.front);
   }
 }
 
 void smartWander() {
-
+  allOff();
+  collide();
+  delay(100);
+  while(object)
+  {
+    // if 
+  }
 }
 
 void smartFollow() {
@@ -488,16 +486,17 @@ void setup() {
   delay(500);
 
   // Change these to suit your stepper if you want
-  stepperLeft.setMaxSpeed(100);
-  stepperLeft.setAcceleration(20);
-  stepperLeft.moveTo(500);
+  // stepperLeft.setMaxSpeed(100);
+  // stepperLeft.setAcceleration(20);
+  // stepperLeft.moveTo(500);
 }
 
 // loop() is never called as setup() never returns
 // this may need to be modified to run the state machine.
 // consider usingnamespace rtos Threads as seen in previous example
 void loop() {
-  runAway();
-  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  follow(20);
+  // read_sensors();
+  //struct lidar data = RPC.call("read_lidars").as<struct lidar>();
   // Serial.println(data.front);
 }

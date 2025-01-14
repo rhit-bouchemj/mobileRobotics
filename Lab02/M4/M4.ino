@@ -33,6 +33,10 @@ https://dumblebots.com/2020/04/02/using-mbed-with-arduino-arm-boards/   */
 using namespace rtos;  //use real time OS methods 
 Thread sensorThread;    //rtos Thread instance
 
+//Array that holds the lidar values (to stop declaration)
+int ldrs[4];
+
+
 // a struct to hold lidar data
 struct lidar {
   // this can easily be extended to contain sonar data as well
@@ -40,6 +44,7 @@ struct lidar {
   int back;
   int left;
   int right;
+  int objectDet;
   // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
   MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
 } dist;
@@ -71,6 +76,13 @@ int read_lidar(int pin) {
   d = (t - 1000) * 3 / 40;
   if (t == 0 || t > 1850 || d < 0) { d = 0; }
   return d;
+}
+
+objectDetection(int frontLdr, int backLdr, leftLdr, rightLdr) {
+  ldrs[0] = frontLdr;
+  ldrs[1] = backLdr;
+  ldrs[2] = leftLdr;
+  ldrs[3] = rightLdr;
 }
 
 // reads a sonar given a pin
@@ -158,6 +170,7 @@ void loop() {
     dist.back = read_lidar(backLdr);
     dist.left = read_lidar(leftLdr);
     dist.right = read_lidar(rightLdr);
+    dist.objectDet = objectDetection(frontLdr, backLdr, leftLdr, rightLdr)
     // dist2.right = read_sonar(rightSnr);    //Slows down readings A LOT (Avoid if possible)
     // dist2.left = read_sonar(leftSnr);
    }
