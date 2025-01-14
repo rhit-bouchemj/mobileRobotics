@@ -120,7 +120,7 @@ void read_sensors() {
   Serial.println(data.right);
   Serial.println(" ");
 }
-void allOFF() {
+void allOff() {
   for (int i = 0; i < 3; i++) {
     digitalWrite(leds[i], LOW);
   }
@@ -305,7 +305,7 @@ void prepForward(int maxVal) {
 }
 
 void randomWanderNoSpin() {
-  allOFF();
+  allOff();
   grnOn();  //turnx on green LED
 
   int maxVal = 6000;  //maximum value for random number
@@ -317,11 +317,11 @@ void randomWanderNoSpin() {
 }
 
 void collide() {
-  allOFF();              //Turn off all LEDs
-  distThresh = 15;
+  allOff();              //Turn off all LEDs
+  int distThresh = 15;
   while (!object) {      //sensor != close)  //Move forward while not sensing wall
     grnOn();             //Turn on green LED
-    prepForward(6000);  //prepare to move forward
+    prepMovement(6000);  //prepare to move forward
     stepperLeft.run();   //increment left motor
     stepperRight.run();  //increment right motor
     struct lidar data = RPC.call("read_lidars").as<struct lidar>();
@@ -345,7 +345,7 @@ void collide() {
 
 void runAway() {
   int p = 2;
-  allOFF();
+  allOff();
   ylwOn();
   struct lidar data = RPC.call("read_lidars").as<struct lidar>();
 
@@ -354,7 +354,7 @@ void runAway() {
     struct lidar data = RPC.call("read_lidars").as<struct lidar>();  // read again incase of missing data
     bool FB = 0;                                                     //not on both front and back
     bool LR = 0;                                                     //not on both left and right
-    distThresh = 20;
+    int distThresh = 20;
 
     if (data.right > distThresh) {  // if further then 30 cm, ignore
       data.right = 0;
@@ -411,32 +411,40 @@ void runAway() {
   }
 }
 
-void follow() {
+void follow(int distance) {
+  allOff();
+  ylwOn();
+  grnOn();
   struct lidar data = RPC.call("read_lidars").as<struct lidar>();
-  if (data.front){
-  stepperLeft.setCurrentPosition(0);
-  stepperRight.setCurrentPosition(0);
-  int delta = data.front - 20;
+  if (data.front){  //object in front of robot
+    stepperLeft.setCurrentPosition(0);    //reset world position
+    stepperRight.setCurrentPosition(0);
+    int delta = data.front - distance;        // difference between intended distance and actual
 
-  stepperLeft.moveTo(constrain(delta, -1, 1)*5000);
-  stepperLeft.setMaxSpeed(delta*100);
-  stepperLeft.setAcceleration(500);
-  stepperLeft.run();
+    stepperLeft.moveTo(constrain(delta, -1, 1)*5000);   // determine if moving forward or backword based on delta
+    stepperRight.moveTo(constrain(delta, -1, 1)*5000);
+    stepperLeft.setMaxSpeed(constrain(delta*100, -500, 500));   //change speed (base 100) by how far 
+    stepperRight.setMaxSpeed(constrain(delta*100, -500, 500));
+    stepperRight.setAcceleration(500);    //replace with non-magik numbers
+    stepperLeft.setAcceleration(500);
+    stepperRight.run();
+    stepperLeft.run();
 
-  stepperRight.moveTo(constrain(delta, -1, 1)*5000);
-  stepperRight.setMaxSpeed(delta*100);
-  stepperRight.setAcceleration(500);
-  stepperRight.run();
-  Serial.print(constrain(delta, -1, 1)*5000);
-  Serial.print("  ");
-  Serial.print(delta);
-  Serial.print("  ");
-  Serial.println(data.front);
+    // Test Delta data
+    // Serial.print(constrain(delta, -1, 1)*5000);
+    // Serial.print("  ");
+    // Serial.print(delta);
+    // Serial.print("  ");
+    // Serial.println(data.front);
   }
 }
 
-void SmartFollow() {
-  allOFF();              //Turn off all LEDs
+void smartWander() {
+
+}
+
+void smartFollow() {
+  allOff();              //Turn off all LEDs
   while (!object) {      //sensor != close) { //Move forward while not sensing wall
     grnOn();             //Turn on green LED
     prepMovement(6000);  //prepare to move forward
@@ -489,7 +497,7 @@ void setup() {
 // this may need to be modified to run the state machine.
 // consider usingnamespace rtos Threads as seen in previous example
 void loop() {
-  //Follow();
+  runAway();
   struct lidar data = RPC.call("read_lidars").as<struct lidar>();
-  Serial.println(data.front);
+  // Serial.println(data.front);
 }

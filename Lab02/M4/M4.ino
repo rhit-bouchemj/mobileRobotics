@@ -67,7 +67,7 @@ struct sonar read_sonars() {
 // reads a lidar given a pin
 int read_lidar(int pin) {
   int d;
-  int16_t t = pulseIn(pin, HIGH);
+  int16_t t = pulseIn(pin, HIGH, 100000);
   d = (t - 1000) * 3 / 40;
   if (t == 0 || t > 1850 || d < 0) { d = 0; }
   return d;
@@ -153,13 +153,13 @@ void setup() {
 
 void loop() {
   if (currentCPU() == "M4") {
-    delay(50);
+    delayMicroseconds(50);
     dist.front = read_lidar(frontLdr);
     dist.back = read_lidar(backLdr);
     dist.left = read_lidar(leftLdr);
     dist.right = read_lidar(rightLdr);
-    dist2.right = read_sonar(rightSnr);
-    dist2.left = read_sonar(leftSnr);
+    // dist2.right = read_sonar(rightSnr);    //Slows down readings A LOT (Avoid if possible)
+    // dist2.left = read_sonar(leftSnr);
    }
 }
 
