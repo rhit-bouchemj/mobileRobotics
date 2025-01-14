@@ -105,7 +105,7 @@ int read_sonar(int pin) {
   return distance;
 }
 //read sensor data from M4 and write to M7
-void read_sonsors() {
+void read_sensors() {
   // read lidar data from struct
   struct lidar data = RPC.call("read_lidars").as<struct lidar>();
   struct sonar data2 = RPC.call("read_sonars").as<struct sonar>();
@@ -286,6 +286,24 @@ void prepMovement(int maxVal) {
   }
 }
 
+/*
+  Prepare movement step (such as numberof steps, max speed, and acceleration)
+  the movement parameters will be equal for both wheels resulting in forward movement
+*/
+void prepForward(int maxVal) {
+  if(stepperLeft.distanceToGo() == 0){      
+      int randomSteps = random(maxVal) + 5;
+      int randomMaxSpeed = random(maxVal) % 400 + 250;
+      int randomAcc = random(maxVal) % 200 + 150;
+      stepperLeft.moveTo(randomSteps);
+      stepperLeft.setMaxSpeed(randomMaxSpeed);
+      stepperLeft.setAcceleration(randomAcc);
+      stepperRight.moveTo(randomSteps);
+      stepperRight.setMaxSpeed(randomMaxSpeed);
+      stepperRight.setAcceleration(randomAcc);
+  }
+}
+
 void randomWanderNoSpin() {
   allOFF();
   grnOn();  //turnx on green LED
@@ -300,14 +318,15 @@ void randomWanderNoSpin() {
 
 void collide() {
   allOFF();              //Turn off all LEDs
-  while (!object) {      //sensor != close) { //Move forward while not sensing wall
+  distThresh = 15;
+  while (!object) {      //sensor != close)  //Move forward while not sensing wall
     grnOn();             //Turn on green LED
-    prepMovement(6000);  //prepare to move forward
+    prepForward(6000);  //prepare to move forward
     stepperLeft.run();   //increment left motor
     stepperRight.run();  //increment right motor
     struct lidar data = RPC.call("read_lidars").as<struct lidar>();
     if (data.right != 0 || data.back != 0 || data.front != 0 || data.left != 0) {
-      if (data.right < 15 || data.back < 15 || data.front < 15 || data.left < 15) {
+      if (data.right < distThresh || data.back < distThresh || data.front < distThresh || data.left < distThresh) {
         object = 1;
         grnOff();
       }
@@ -318,7 +337,7 @@ void collide() {
   if (data.right == 0 & data.back == 0 & data.front == 0 & data.left == 0) {
     object = 0;
     redOff();
-  } else if (data.right >= 15 & data.back >= 15 & data.front >= 15 & data.left >= 15) {
+  } else if (data.right >= distThresh & data.back >= distThresh & data.front >= distThresh & data.left >= distThresh) {
     object = 0;
     redOff();
   }
@@ -335,33 +354,34 @@ void runAway() {
     struct lidar data = RPC.call("read_lidars").as<struct lidar>();  // read again incase of missing data
     bool FB = 0;                                                     //not on both front and back
     bool LR = 0;                                                     //not on both left and right
+    distThresh = 20;
 
-    if (data.right > 30) {  // if further then 30 cm, ignore
+    if (data.right > distThresh) {  // if further then 30 cm, ignore
       data.right = 0;
     }
-    if (data.back > 30) {
+    if (data.back > distThresh) {
       data.back = 0;
     }
-    if (data.left > 30) {
+    if (data.left > distThresh) {
       data.left = 0;
     }
-    if (data.front > 30) {
+    if (data.front > distThresh) {
       data.front = 0;
     }
-    if (data.front <= 20 && data.back <= 20 && data.front && data.back) {  // both left and right
-      data.front = 0;
+    if (data.front <= distThresh && data.back <= distThresh && data.front && data.back) {  // both front and back
+      data.front = 0;   //ignore front and back sensor data
       data.back = 0;
       FB = 1;
-      if (!data.left && !data.right) {  // turn right
-        data.left = 4;
+      if (!data.left && !data.right) {  // turn to right sensor and move if free space
+        data.left = 4;    // fake object to left <-- force to right
       }
     }
-    if (data.left <= 20 && data.right <= 20 && data.left && data.right) {  // both front and back
-      data.left = 0;
+    if (data.left <= distThresh && data.right <= distThresh && data.left && data.right) {  // both left and right
+      data.left = 0;    //ignore left and right sensor data
       data.right = 0;
       LR = 1;
-      if (!data.front && !data.back) {  // turn left
-        data.back = 4;
+      if (!data.front && !data.back) {  // turn to front sensor and move if free space
+        data.back = 4;    // fake object to back
       }
     }
 
@@ -391,7 +411,7 @@ void runAway() {
   }
 }
 
-void Follow() {
+void follow() {
   struct lidar data = RPC.call("read_lidars").as<struct lidar>();
   if (data.front){
   stepperLeft.setCurrentPosition(0);

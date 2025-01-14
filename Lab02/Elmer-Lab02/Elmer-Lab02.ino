@@ -556,18 +556,16 @@ void follow() {
 
 
 /*
-
+  The robot moves forward until it senses an object close to its front, it will then move opposite of the object relative to how close to the object that it was
 */
 void runAway() {
   allOff();
   ylwOn();
+
   int prop = 0.5;   //Linear proportional controller of distance moved
-  while(data.front > 20) {//sensor != close && lidar != close) {} //Move forward while not sensing wall
-    //Calculate feel force
-    int xSens = data.front - data.back;  //total X sensor = front - back
-    int ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
-    goToGoal(-xSens*prop, -ySens*prop); //Go to a proportionalDistance in the opposite direction as sensed
-  }
+  int xSens = data.front - data.back;  //total X sensor = front - back
+  int ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
+  goToGoal(-xSens*prop, -ySens*prop); //Go to a proportionalDistance in the opposite direction as sensed
   allOff();
   // TODO: How to unstuck???
 }
@@ -579,7 +577,7 @@ void collide() {
   maxValue = 6000;
   while(data.front > 20) {//sensor != close) { //Move forward while not sensing wall
     grnOn();  //Turn on green LED
-    prepMovement(maxValue); //prepare to move forward
+    prepForward(maxValue); //prepare to move forward
     stepperLeft.run();    //increment left motor
     stepperRight.run();   //increment right motor
   }
