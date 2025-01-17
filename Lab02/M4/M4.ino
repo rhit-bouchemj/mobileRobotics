@@ -44,7 +44,7 @@ struct lidar {
   int back;
   int left;
   int right;
-  int objectDet;
+  int closeObj;
   // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
   MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
 } dist;
@@ -78,11 +78,29 @@ int read_lidar(int pin) {
   return d;
 }
 
-objectDetection(int frontLdr, int backLdr, leftLdr, rightLdr) {
-  ldrs[0] = frontLdr;
-  ldrs[1] = backLdr;
-  ldrs[2] = leftLdr;
-  ldrs[3] = rightLdr;
+
+/*
+  get the minimum value for the lidar detectors to see how close to a wall they are (0 = max value too so don't include)
+*/
+int minLidar(int frontL, int backL, int leftL, int rightL) {
+  ldrs[0] = frontL;
+  ldrs[1] = backL;
+  ldrs[2] = leftL;
+  ldrs[3] = rightL;
+
+  int minValue = 100;
+  for(int i = 0; i < sizeof(ldrs); i++)
+  {
+    if(ldrs[i] < minValue && ldrs[i] != 0)
+    {
+      minValue = ldrs[i];
+    }
+  }
+  if(minValue == 100) //starting value
+  {
+    minValue = 0;
+  }
+  return minValue;
 }
 
 // reads a sonar given a pin
@@ -170,7 +188,7 @@ void loop() {
     dist.back = read_lidar(backLdr);
     dist.left = read_lidar(leftLdr);
     dist.right = read_lidar(rightLdr);
-    dist.objectDet = objectDetection(frontLdr, backLdr, leftLdr, rightLdr)
+    dist.closeObj = minLidar(dist.front, dist.back, dist.left, dist.right);
     // dist2.right = read_sonar(rightSnr);    //Slows down readings A LOT (Avoid if possible)
     // dist2.left = read_sonar(leftSnr);
    }
