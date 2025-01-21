@@ -80,7 +80,7 @@ int read_lidar(int pin) {
 
 
 /*
-  get the minimum value for the lidar detectors to see how close to a wall they are (0 = max value too so don't include)
+  get the minimum value for the lidar detectors to see how close to a wall they are (0 = max value too so don't include, 100 = newMax)
 */
 int minLidar(int frontL, int backL, int leftL, int rightL) {
   ldrs[0] = frontL;
@@ -96,10 +96,10 @@ int minLidar(int frontL, int backL, int leftL, int rightL) {
       minValue = ldrs[i];
     }
   }
-  if(minValue == 100) //starting value
-  {
-    minValue = 0;
-  }
+  // if(minValue == 100) //starting value
+  // {
+  //   minValue = 0;
+  // }
   return minValue;
 }
 

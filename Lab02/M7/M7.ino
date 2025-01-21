@@ -55,10 +55,12 @@ struct lidar {
   int back;
   int left;
   int right;
+  int closeObj;
   // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
   MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
 } dist;
 
+struct lidar data;
 
 // a struct to hold lidar data
 struct sonar {
@@ -107,7 +109,7 @@ int read_sonar(int pin) {
 //read sensor data from M4 and write to M7
 void read_sensors() {
   // read lidar data from struct
-  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  data = RPC.call("read_lidars").as<struct lidar>();
   // struct sonar data2 = RPC.call("read_sonars").as<struct sonar>();
   // print lidar data
   Serial.print("lidar: ");
@@ -118,6 +120,8 @@ void read_sensors() {
   Serial.print(data.left);
   Serial.print(", ");
   Serial.println(data.right);
+  Serial.println(", ");
+  Serial.println(data.closeObj);
   Serial.println(" ");
 }
 
@@ -212,17 +216,30 @@ void spin(int degree, int speed) {
   int signOfDegree = constrain(degree, -1, 1);
   int dis = degree * 3.14 * wheel_base / (2 * 180);
   int steps = dis_to_step(dis);  //+ offset;
+  // stepperLeft.setMaxSpeed(speed);
+  // stepperLeft.setAcceleration(100.0);
+  // stepperLeft.runToNewPosition(-steps);
+  // stepperRight.setMaxSpeed(speed);
+  // stepperRight.setAcceleration(100.0);
+  // stepperRight.runToNewPosition(steps);
+  // steppers.runSpeedToPosition();
+
+  stepperLeft.setMaxSpeed(speed);
+  stepperRight.setMaxSpeed(speed);
+  stepperLeft.setAcceleration(100.0);
+  stepperRight.setAcceleration(100.0);
+
   stepperRight.moveTo(steps);
   stepperLeft.moveTo(-steps);
-  /*
-  stepperRight.setMaxSpeed(speed);
-  stepperLeft.setMaxSpeed(speed);
-  stepperLeft.setAcceleration(200);
-  stepperLeft.setAcceleration(200);
-  */
-  steppers.runSpeedToPosition();
+
+  while(stepperLeft.distanceToGo() != 0 && stepperRight.distanceToGo() != 0)
+  {
+    stepperLeft.run();
+    stepperRight.run();
+  }  
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
+
 }
 
 void forward(int distance, int speed) {
@@ -252,6 +269,9 @@ void reverse(int distance, int speed) {
 }
 
 void GoToGoal(long x, long y) {
+  stepperLeft.setCurrentPosition(0);
+  stepperRight.setCurrentPosition(0);
+
   float radian = atan2(y, x);
   int degree = radian * 57.3;
   long dis = sqrt(sq(x) + sq(y));
@@ -317,15 +337,19 @@ void randomWanderNoSpin() {
   stepperRight.run();
 }
 
-void collide() {
+/*
+  When sensing an object in any direction the robot will stop.
+  The distance threshold that determines how close to an object counts is a parameter in the command.
+*/
+void collide(int distThresh) {
   allOff();              //Turn off all LEDs
-  int distThresh = 15;
+  // int distThresh = 15;
   while (!object) {      //sensor != close)  //Move forward while not sensing wall
     grnOn();             //Turn on green LED
     prepMovement(6000);  //prepare to move forward
     stepperLeft.run();   //increment left motor
     stepperRight.run();  //increment right motor
-    struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+    data = RPC.call("read_lidars").as<struct lidar>();
     if (data.right != 0 || data.back != 0 || data.front != 0 || data.left != 0) {
       if (data.right < distThresh || data.back < distThresh || data.front < distThresh || data.left < distThresh) {
         object = 1;
@@ -334,7 +358,7 @@ void collide() {
     }
   }
   redOn();  //turn on red LED
-  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  data = RPC.call("read_lidars").as<struct lidar>();
   if (data.right == 0 & data.back == 0 & data.front == 0 & data.left == 0) {
     object = 0;
     redOff();
@@ -344,32 +368,30 @@ void collide() {
   }
 }
 
-void runAway() {
+/*
+  When sensing an object in any direction the robot will try to get away from the object at a distance that is proportional to how close to the object that the robot is.
+  The robot will try to run away in a direction opposite of where the objects were detected.
+  It uses a deadzone of 10% of the distance threshold.
+  If the robot detects an object in 2 polar directions it will negate them.
+  If the robot detects an object in 4 directions it will do nothing
+  The distance threshold that determines how far to run away from is a parameter in the command.
+*/
+void runAway(int distThresh) {
   int p = 2;
+  int tolerance = distThresh/10;
   allOff();
   ylwOn();
-  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  data = RPC.call("read_lidars").as<struct lidar>();
 
-  if (data.right != 0 || data.back != 0 || data.front != 0 || data.left != 0) {  // object present
+  if (data.closeObj < distThresh - tolerance) {  // object present
     delay(100);
-    struct lidar data = RPC.call("read_lidars").as<struct lidar>();  // read again incase of missing data
+    data = RPC.call("read_lidars").as<struct lidar>();  // read again incase of missing data
     bool FB = 0;                                                     //not on both front and back
     bool LR = 0;                                                     //not on both left and right
-    int distThresh = 20;
+    // int distThresh = 20;
 
-    if (data.right > distThresh) {  // if further then 30 cm, ignore
-      data.right = 0;
-    }
-    if (data.back > distThresh) {
-      data.back = 0;
-    }
-    if (data.left > distThresh) {
-      data.left = 0;
-    }
-    if (data.front > distThresh) {
-      data.front = 0;
-    }
-    if (data.front <= distThresh && data.back <= distThresh && data.front && data.back) {  // both front and back
+
+    if (data.front <= distThresh && data.back <= distThresh && data.back && data.front) {  // both front and back
       data.front = 0;   //ignore front and back sensor data
       data.back = 0;
       FB = 1;
@@ -377,6 +399,17 @@ void runAway() {
         data.left = 4;    // fake object to left <-- force to right
       }
     }
+    else
+    {
+      if (data.front > distThresh - tolerance) {  // if further then 30 cm, ignore
+        data.front = 0;
+      }
+      if (data.back > distThresh - tolerance) {
+        data.back = 0;
+      }
+    }
+
+    //clear data above threshold
     if (data.left <= distThresh && data.right <= distThresh && data.left && data.right) {  // both left and right
       data.left = 0;    //ignore left and right sensor data
       data.right = 0;
@@ -384,6 +417,15 @@ void runAway() {
       if (!data.front && !data.back) {  // turn to front sensor and move if free space
         data.back = 4;    // fake object to back
       }
+    }
+    else
+    {
+      if (data.left > distThresh - tolerance) {
+        data.left = 0;
+      }
+      if (data.right > distThresh - tolerance) {
+        data.front = 0;
+    }
     }
 
     if (LR && FB) {  //in a box
@@ -400,20 +442,38 @@ void runAway() {
       // Serial.println(constrain(ySens, -1, 1) * (-30) + ySens);
       // Serial.println("-----");
       // delay(500);
-    
+  
+      if(data.closeObj >= distThresh - tolerance)    //check if object in threshold to leave loops
+      {
+        object = 0;
+      }
     }
   }
 }
 
+
+
+/*
+  The command should maintain a distance from an object that it detects to the front via a proportional controller.
+  It uses a deadzone of 2 to determine when to stop in order to avoid stuttering.
+  The distance that it should follow from is a parameter in the command.
+*/
 void follow(int distance) {
   allOff();
   ylwOn();
   grnOn();
-  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
-  if (data.front){  //object in front of robot
+  data = RPC.call("read_lidars").as<struct lidar>();
+  while(data.front){  //object in front of robot
+    data = RPC.call("read_lidars").as<struct lidar>();
+
     stepperLeft.setCurrentPosition(0);    //reset world position
     stepperRight.setCurrentPosition(0);
+
     int delta = data.front - distance;        // difference between intended distance and actual
+    if(delta < 2 && delta > -2)   //deadzone creation
+    {
+      delta = 0;
+    }
     int sign = constrain(delta, -1, 1);
     stepperLeft.moveTo(sign*5000);   // determine if moving forward or backword based on delta
     stepperRight.moveTo(sign*5000);
@@ -423,58 +483,29 @@ void follow(int distance) {
     stepperLeft.run();
 
     // Test Delta data
-    Serial.print(constrain(delta, -1, 1)*5000);
-    Serial.print("  ");
-    Serial.print(delta);
-    Serial.print("  ");
-    Serial.println(data.front);
+    // Serial.print(constrain(delta, -1, 1)*5000);
+    // Serial.print("  ");
+    // Serial.print(delta);
+    // Serial.print("  ");
+    // Serial.println(data.front);
   }
 }
 
-void smartWander() {
+void smartWander(int collideDist, int runDist) {
   allOff();
-  collide();
+  collide(collideDist);
   delay(100);
   while(object)
   {
-    // if 
+    runAway(runDist);
   }
 }
 
-void smartFollow() {
-  allOff();              //Turn off all LEDs
-  while (!object) {      //sensor != close) { //Move forward while not sensing wall
-    grnOn();             //Turn on green LED
-    prepMovement(6000);  //prepare to move forward
-    stepperLeft.run();   //increment left motor
-    stepperRight.run();  //increment right motor
-    struct lidar data = RPC.call("read_lidars").as<struct lidar>();
-    if (data.right || data.back || data.front || data.left) {
-      if (data.right < 30 || data.back < 30 || data.front < 30 || data.left < 30) {
-        object = 1;
-        grnOff();
-      }
-    }
-  }
-  redOn();                                                         //turn on red LED
-  delay(3000);                                                     // stop for 3 sec
-  struct lidar data = RPC.call("read_lidars").as<struct lidar>();  // read data again
-
-  if (data.left) {
-    reverse(10, 100);
-    spin(-90, 200);
-  } else if (data.right) {
-    reverse(10, 100);
-    spin(90, 200);
-  }
-
-  if (data.right == 0 & data.back == 0 & data.front == 0 & data.left == 0) {
-    object = 0;
-    redOff();
-  } else if (data.right >= 15 & data.back >= 15 & data.front >= 15 & data.left >= 15) {
-    object = 0;
-    redOff();
-  }
+void smartFollow(int collideDist, int followDist) {
+  allOff();               //Turn off all LEDs
+  collide(collideDist);
+  delay(100);
+  follow(followDist);     //
 }
 
 //setup function w/infinite loops to send/recv data
@@ -495,8 +526,9 @@ void setup() {
 // this may need to be modified to run the state machine.
 // consider usingnamespace rtos Threads as seen in previous example
 void loop() {
-  follow(20);
+  // follow(20);
+  smartFollow(10, 15);
   // read_sensors();
-  //struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  //data = RPC.call("read_lidars").as<struct lidar>();
   // Serial.println(data.front);
 }
