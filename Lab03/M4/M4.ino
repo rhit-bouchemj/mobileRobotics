@@ -14,6 +14,10 @@ upload M4 first and then turn on M7 serial monitor
   Click Check to Verify and Right Arrow to Upload
   M4 is the server and M7 is the client */
 
+/*
+  Modified by: Mitch Boucher and Evereset Zhang
+  Modified last: 1/24/2025
+*/
 
 #include "Arduino.h"
 #include "RPC.h"
@@ -44,7 +48,7 @@ struct lidar {
   float back;
   float left;
   float right;
-  //float closeObj;
+  float closeObj;
   // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
   MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
 } dist;
@@ -80,15 +84,15 @@ float read_lidar(int pin) {
 
 
 /*
-  get the minimum value for the lidar detectors to see how close to a wall they are (0 = max value too so don't include)
+  get the minimum value for the lidar detectors to see how close to a wall they are (0 = max value too so don't include, 100 = newMax)
 */
-int minLidar(int frontL, int backL, int leftL, int rightL) {
+float minLidar(int frontL, int backL, int leftL, int rightL) {
   ldrs[0] = frontL;
   ldrs[1] = backL;
   ldrs[2] = leftL;
   ldrs[3] = rightL;
 
-  int minValue = 100;
+  float minValue = 100.0;
   for(int i = 0; i < sizeof(ldrs); i++)
   {
     if(ldrs[i] < minValue && ldrs[i] != 0)
@@ -96,13 +100,8 @@ int minLidar(int frontL, int backL, int leftL, int rightL) {
       minValue = ldrs[i];
     }
   }
-  if(minValue == 100) //starting value
-  {
-    minValue = 0;
-  }
   return minValue;
 }
-
 
 // reads a sonar given a pin
 int read_sonar(int pin) {
@@ -189,9 +188,8 @@ void loop() {
     dist.back = read_lidar(backLdr);
     dist.left = read_lidar(leftLdr);
     dist.right = read_lidar(rightLdr);
-    //dist.closeObj = minLidar(dist.front, dist.back, dist.left, dist.right);
+    dist.closeObj = minLidar(dist.front, dist.back, dist.left, dist.right);
     // dist2.right = read_sonar(rightSnr);    //Slows down readings A LOT (Avoid if possible)
     // dist2.left = read_sonar(leftSnr);
    }
 }
-

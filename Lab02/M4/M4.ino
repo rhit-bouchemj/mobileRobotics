@@ -14,6 +14,10 @@ upload M4 first and then turn on M7 serial monitor
   Click Check to Verify and Right Arrow to Upload
   M4 is the server and M7 is the client */
 
+/*
+  Modified by: Mitch Boucher and Evereset Zhang
+  Modified last: 1/24/2025
+*/
 
 #include "Arduino.h"
 #include "RPC.h"
@@ -40,11 +44,11 @@ int ldrs[4];
 // a struct to hold lidar data
 struct lidar {
   // this can easily be extended to contain sonar data as well
-  int front;
-  int back;
-  int left;
-  int right;
-  int closeObj;
+  float front;
+  float back;
+  float left;
+  float right;
+  float closeObj;
   // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
   MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
 } dist;
@@ -70,10 +74,10 @@ struct sonar read_sonars() {
 }
 
 // reads a lidar given a pin
-int read_lidar(int pin) {
-  int d;
+float read_lidar(int pin) {
+  float d;
   int16_t t = pulseIn(pin, HIGH, 100000);
-  d = (t - 1000) * 3 / 40;
+  d = (float(t) - 1000.0) * 3.0 / 40.0;
   if (t == 0 || t > 1850 || d < 0) { d = 0; }
   return d;
 }
@@ -82,13 +86,13 @@ int read_lidar(int pin) {
 /*
   get the minimum value for the lidar detectors to see how close to a wall they are (0 = max value too so don't include, 100 = newMax)
 */
-int minLidar(int frontL, int backL, int leftL, int rightL) {
+float minLidar(int frontL, int backL, int leftL, int rightL) {
   ldrs[0] = frontL;
   ldrs[1] = backL;
   ldrs[2] = leftL;
   ldrs[3] = rightL;
 
-  int minValue = 100;
+  float minValue = 100.0;
   for(int i = 0; i < sizeof(ldrs); i++)
   {
     if(ldrs[i] < minValue && ldrs[i] != 0)
