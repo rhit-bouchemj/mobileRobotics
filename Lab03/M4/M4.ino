@@ -48,7 +48,7 @@ struct lidar {
   float back;
   float left;
   float right;
-  float closeObj;
+  float closestObj;   //This is the minimum non-zero distance of the robot to an object
   // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
   MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
 } dist;
@@ -188,7 +188,7 @@ void loop() {
     dist.back = read_lidar(backLdr);
     dist.left = read_lidar(leftLdr);
     dist.right = read_lidar(rightLdr);
-    dist.closeObj = minLidar(dist.front, dist.back, dist.left, dist.right);
+    dist.closestObj = minLidar(dist.front, dist.back, dist.left, dist.right);
     // dist2.right = read_sonar(rightSnr);    //Slows down readings A LOT (Avoid if possible)
     // dist2.left = read_sonar(leftSnr);
    }
