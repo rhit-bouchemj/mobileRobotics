@@ -618,7 +618,7 @@ void smartFollow(int collideDist, int followDist) {
   Follow a wall
   Wall = 1<-- Front, 2<-- Back, 3<-- left, 4<-- right
 */
-void wallFollow() {
+bool wallFollow() {
   int a = 3;
   data = RPC.call("read_lidars").as<struct lidar>();
   unsigned long previousMillis = 0;
@@ -626,30 +626,39 @@ void wallFollow() {
   float d = 0;
   float p = 0;
   
-  if (data.left) {
+  if (data.left && data.left <= 15) {
     getParallel(3);
-  } else if (data.right) {
+  } else if (data.right && data.right <= 15) {
     getParallel(4);
-  } else if (data.front) {
+  } else if (data.front && data.front <= 15) {
     getParallel(1);
   }
   delay(500);
   data = RPC.call("read_lidars").as<struct lidar>();
   int wall = 0;  // 3 left, 4 right
 
-  if (data.left && data.left < 25) {
+  if (data.left && data.left < 15) {
     wall = 3;
-  } else if (data.right && data.right < 25) {
+  } else if (data.right && data.right < 15) {
     wall = 4;
   }
 
   if (wall == 3) {
     delay(50);
+    int upperThresh = 15;
+    int lowerThresh = 10;
     data = RPC.call("read_lidars").as<struct lidar>();
     d = data.left;
     p = data.left;
     previousMillis = millis();
     while (d) {
+      if (data.right && data.right < 15){
+        upperThresh = (data.left + data.right)/2 + 2;
+        lowerThresh = upperThresh - 5;
+      }else{
+        upperThresh = 15;
+        lowerThresh = 10;
+      }
       if (d > 15) {
         redOn();
         pivot(0, 30);
@@ -690,6 +699,18 @@ void wallFollow() {
           d = data.left;
           p = data.left;
         }
+        if (data.left == 0) {  //lost wall on left
+          pivot(0, 90);
+          forward(30, 300);
+          data = RPC.call("read_lidars").as<struct lidar>();
+          if (data.left == 0) {
+            return false;
+          }
+          getParallel(3);
+          data = RPC.call("read_lidars").as<struct lidar>();
+          d = data.left;
+          p = data.left;
+        }
         d = data.left;
         int i = 0;
 
@@ -709,12 +730,21 @@ void wallFollow() {
     }
   } else if (wall == 4) {
     delay(50);
+    int upperThresh = 15;
+    int lowerThresh = 10;
     data = RPC.call("read_lidars").as<struct lidar>();
     d = data.right;
     p = data.right;
 
     previousMillis = millis();
     while (d) {
+      if (data.left && data.left < 15){
+        upperThresh = (data.left + data.right)/2 + 2;
+        lowerThresh = upperThresh - 5;
+      }else{
+        upperThresh = 15;
+        lowerThresh = 10;
+      }
       if (d > 15) {
         redOn();
         pivot(1, -30);
@@ -755,6 +785,18 @@ void wallFollow() {
           d = data.right;
           p = data.right;
           allOff();
+        }
+        if (data.right == 0) {  //lost wall on right
+          pivot(1, -90);
+          forward(30, 300);
+          data = RPC.call("read_lidars").as<struct lidar>();
+          if (data.right == 0) {
+            return false;
+          }
+          getParallel(4);
+          data = RPC.call("read_lidars").as<struct lidar>();
+          d = data.right;
+          p = data.right;
         }
         d = data.right;
         int i = 0;
@@ -914,6 +956,53 @@ void getParallel(int location) {
   }
 }
 
+float minLidar(float frontL, float backL, float leftL, float rightL) {
+  float ldrs[4];
+  ldrs[0] = frontL;
+  ldrs[1] = backL;
+  ldrs[2] = leftL;
+  ldrs[3] = rightL;
+
+
+  float minValue = 100.0;
+  for (int i = 0; i < 4; i++) {
+    if (ldrs[i] < minValue && ldrs[i] != 0) {
+      minValue = ldrs[i];
+    }
+  }
+  // if(minValue == 100) //starting value
+  // {
+  //   minValue = 0;
+  // }
+  return minValue;
+}
+
+void randomWanderWallFollow() {
+  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  int distThresh = 15;
+  unsigned long previousMillis = 0;
+  const unsigned long interval = 50;
+  while (!object) {
+    grnOn();             //Turn on green LED
+    prepMovement(6000);  //prepare to move forward
+    stepperLeft.run();   //increment left motor
+    stepperRight.run();  //increment right motor
+    updateGlobalPosition();
+    if (millis() - previousMillis >= interval) {
+      data = RPC.call("read_lidars").as<struct lidar>();
+      previousMillis = millis();      
+    }
+
+    if (minLidar(data.front, data.back, data.left, data.right) < distThresh) {
+      object = 1;
+      grnOff();
+    }
+
+  }
+  wallFollow();
+  object = 0;
+}
+
 
 void setup() {
   RPC.begin();
@@ -926,9 +1015,11 @@ void setup() {
 }
 
 void loop() {
-
+  randomWanderWallFollow();
+/*
   data = RPC.call("read_lidars").as<struct lidar>();
   delay(10);
 
   print_sensors();
+  */
 }
