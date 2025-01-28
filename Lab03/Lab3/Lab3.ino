@@ -222,7 +222,7 @@ float step_to_dis(int step) {
 /*
   Set the current position and step counter to zero
 */
-void set_zero() {
+void set_zero() { 
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
   prev_l_step = 0;
@@ -615,6 +615,7 @@ void smartFollow(int collideDist, int followDist) {
 
 /*
   Follow a wall
+  Wall = 1<-- Front, 2<-- Back, 3<-- left, 4<-- right
 */
 void wallFollow() {
   int a = 3;
@@ -623,6 +624,7 @@ void wallFollow() {
   const unsigned long interval = 500;
   float d = 0;
   float p = 0;
+  
   if (data.left) {
     getParallel(3);
   } else if (data.right) {
@@ -633,6 +635,7 @@ void wallFollow() {
   delay(500);
   data = RPC.call("read_lidars").as<struct lidar>();
   int wall = 0;  // 3 left, 4 right
+
   if (data.left && data.left < 25) {
     wall = 3;
   } else if (data.right && data.right < 25) {
