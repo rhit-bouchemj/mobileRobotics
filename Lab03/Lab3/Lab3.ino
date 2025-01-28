@@ -425,6 +425,11 @@ void prepForward(int maxVal) {
   }
 }
 
+/*
+  The robot will randomly wander around
+  The type of random wandering is determined by each wheel independently getting a distance to travel, at a random speed and acceleration
+  The distance, speed, and acceleration random value is limited by the constant maxValue
+*/
 void randomWanderNoSpin() {
   allOff();
   grnOn();  //turnx on green LED
@@ -535,13 +540,14 @@ void runAway(int distThresh) {
       int ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
       GoToGoal((constrain(xSens, -1, 1) * (-distThresh) + xSens) * p, (constrain(ySens, -1, 1) * (-distThresh) + ySens) * p);
       
-      //Test sense data
-      // Serial.println(xSens);
-      // Serial.println(ySens);
-      // Serial.println(constrain(xSens, -1, 1) * (-30) + xSens);
-      // Serial.println(constrain(ySens, -1, 1) * (-30) + ySens);
-      // Serial.println("-----");
-      // delay(500);
+      /*Test sense data
+      Serial.println(xSens);
+      Serial.println(ySens);
+      Serial.println(constrain(xSens, -1, 1) * (-30) + xSens);
+      Serial.println(constrain(ySens, -1, 1) * (-30) + ySens);
+      Serial.println("-----");
+      delay(500);
+      */
   
       if(data.closestObj >= distThresh - tolerance)    //check if object in threshold to leave loops
       {
