@@ -87,19 +87,37 @@ float read_lidar(int pin) {
   get the minimum value for the lidar detectors to see how close to a wall they are (0 = max value too so don't include, 100 = newMax)
 */
 float minLidar(float frontL, float backL, float leftL, float rightL) {
-  ldrs[0] = frontL;
-  ldrs[1] = backL;
-  ldrs[2] = leftL;
-  ldrs[3] = rightL;
+  // ldrs[0] = frontL;
+  // ldrs[1] = backL;
+  // ldrs[2] = leftL;
+  // ldrs[3] = rightL;
 
   float minValue = 100.0;
-  for(int i = 0; i < sizeof(ldrs); i++)
-  {
-    if(ldrs[i] < minValue && ldrs[i] != 0.0)
-    {
-      minValue = ldrs[i];
-    }
+
+  if (frontL > 1 && frontL < minValue) {
+    minValue = frontL;
   }
+  if (frontL > 1 && backL < minValue) {
+    minValue = backL;
+  }
+  if (frontL > 1 && leftL < minValue) {
+    minValue = leftL;
+  }
+  if (frontL > 1 && rightL < minValue) {
+    minValue = rightL;
+  }
+
+  // for(int i = 0; i < sizeof(ldrs); i++)
+  // {
+  //   if(ldrs[i] < minValue && ldrs[i] != 0)
+  //   {
+  //     minValue = ldrs[i];
+  //   }
+  // }
+  // if(minValue == 100) //starting value
+  // {
+  //   minValue = 0;
+  // }
   return minValue;
 }
 

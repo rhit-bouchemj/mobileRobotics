@@ -76,7 +76,7 @@ struct lidar {
   float back;
   float left;
   float right;
-  float closeObj;
+  float closestObj;
   // this defines some helper functions that allow RPC to send our struct (I found this on a random forum)
   MSGPACK_DEFINE_ARRAY(front, back, left, right);  //https://stackoverflow.com/questions/37322145/msgpack-to-pack-structures https://www.appsloveworld.com/cplus/100/391/msgpack-to-pack-structures
 } dist;
@@ -128,7 +128,7 @@ int read_sonar(int pin) {
   return distance;
 }
 //read sensor data from M4 and write to M7
-void read_sensors() {
+void print_sensors() {
   // read lidar data from struct
   data = RPC.call("read_lidars").as<struct lidar>();
   // struct sonar data2 = RPC.call("read_sonars").as<struct sonar>();
@@ -140,8 +140,9 @@ void read_sensors() {
   Serial.print(", ");
   Serial.print(data.left);
   Serial.print(", ");
-  Serial.println(data.right);
-  Serial.println(" ");
+  Serial.print(data.right);
+  Serial.println(", ");
+  Serial.println(data.closestObj);
 }
 
 /*
@@ -248,14 +249,14 @@ void updateGlobalPosition() {
 
 //Simple Helper Functions
 
-void runAndUpdate() {
-  this->run();
-  this->updateGlobalPosition();
-}
+void runAndUpdate(AccelStepper &stepperMotor) {
+  stepperMotor.run();
+  updateGlobalPosition();
+  }
 
-void runSpeedAndUpdate() {
-  this->runspeed();
-  this->updateGlobalPosition();
+void runSpeedAndUpdate(AccelStepper &stepperMotor) {
+  stepperMotor.runSpeed();
+  updateGlobalPosition();
 }
 
 
@@ -326,8 +327,8 @@ void forward(int distance, int speed) {
   stepperLeft.setAcceleration(int(speed / 3));
   stepperRight.setAcceleration(int(speed / 3));
   while (stepperLeft.distanceToGo()) {
-    stepperLeft.runAndUpdate();
-    stepperRight.runAndUpdate();
+    runAndUpdate(stepperLeft);
+    runAndUpdate(stepperRight);
   }
   set_zero();
 }
@@ -366,14 +367,14 @@ void pivot(bool wheel, float degree) {
     stepperRight.setMaxSpeed(700);
     stepperRight.setAcceleration(500);
     while (stepperRight.distanceToGo()) {
-      stepperRight.runAndUpdate();
+      runAndUpdate(stepperRight);
     }
   } else {
     stepperLeft.moveTo(-steps);
     stepperLeft.setMaxSpeed(700);
     stepperLeft.setAcceleration(500);
     while (stepperLeft.distanceToGo()) {
-      stepperLeft.runAndUpdate();
+      runAndUpdate(stepperLeft);
     }
   }
   set_zero();
@@ -482,7 +483,7 @@ void runAway(int distThresh) {
   ylwOn();
   data = RPC.call("read_lidars").as<struct lidar>();
 
-  if (data.closeObj < distThresh - tolerance) {  // object present
+  if (data.closestObj < distThresh - tolerance) {  // object present
     delay(100);
     data = RPC.call("read_lidars").as<struct lidar>();  // read again incase of missing data
     bool FB = 0;                                                     //not on both front and back
@@ -542,7 +543,7 @@ void runAway(int distThresh) {
       // Serial.println("-----");
       // delay(500);
   
-      if(data.closeObj >= distThresh - tolerance)    //check if object in threshold to leave loops
+      if(data.closestObj >= distThresh - tolerance)    //check if object in threshold to leave loops
       {
         object = 0;
       }
@@ -670,8 +671,8 @@ void wallFollow() {
         stepperRight.setMaxSpeed(2000);
         stepperLeft.setSpeed(200);
         stepperRight.setSpeed(200);
-        stepperLeft.runSpeedAndUpdate();
-        stepperRight.runSpeedAndUpdate();
+        runSpeedAndUpdate(stepperLeft);
+        runSpeedAndUpdate(stepperRight);
       }
       if (millis() - previousMillis >= interval) {
         data = RPC.call("read_lidars").as<struct lidar>();
@@ -698,8 +699,8 @@ void wallFollow() {
           stepperRight.setMaxSpeed(2000);
           stepperLeft.setSpeed(200 - (d - p) * 50);
           stepperRight.setSpeed(200 + (d - p) * 50);
-          stepperLeft.runSpeedAndUpdate();
-          stepperRight.runSpeedAndUpdate();
+          runSpeedAndUpdate(stepperLeft);
+          runSpeedAndUpdate(stepperRight);
           i = i + 1;
         }
         p = d;
@@ -736,8 +737,8 @@ void wallFollow() {
         stepperRight.setMaxSpeed(2000);
         stepperLeft.setSpeed(200);
         stepperRight.setSpeed(200);
-        stepperLeft.runSpeedAndUpdate();
-        stepperRight.runSpeedAndUpdate();
+        runSpeedAndUpdate(stepperLeft);
+        runSpeedAndUpdate(stepperRight);
       }
       if (millis() - previousMillis >= interval) {
         data = RPC.call("read_lidars").as<struct lidar>();
@@ -753,7 +754,7 @@ void wallFollow() {
           data = RPC.call("read_lidars").as<struct lidar>();
           d = data.right;
           p = data.right;
-          allOFF();
+          allOff();
         }
         d = data.right;
         int i = 0;
@@ -763,8 +764,8 @@ void wallFollow() {
           stepperRight.setMaxSpeed(2000);
           stepperLeft.setSpeed(200 + (d - p) * 50);
           stepperRight.setSpeed(200 - (d - p) * 50);
-          stepperLeft.runSpeedAndUpdate();
-          stepperRight.runSpeedAndUpdate();
+          runSpeedAndUpdate(stepperLeft);
+          runSpeedAndUpdate(stepperRight);
           i = i + 1;
         }
         p = d;
@@ -790,7 +791,7 @@ void getParallel(int location) {
     stepperLeft.setMaxSpeed(200);
     stepperLeft.setAcceleration(200);
     while (!data.right || data.right > 15) {  //nothing on right or more than 15
-      stepperLeft.runAndUpdate();
+      runAndUpdate(stepperLeft);
       if (millis() - previousMillis >= interval) {
         data = RPC.call("read_lidars").as<struct lidar>();
         previousMillis = millis();
@@ -812,7 +813,7 @@ void getParallel(int location) {
       stepperRight.setAcceleration(200);
 
       while (!data.left || data.left > 15) {  //nothing on left
-        stepperRight.runAndUpdate();
+        runAndUpdate(stepperRight);
         if (millis() - previousMillis >= interval) {
           data = RPC.call("read_lidars").as<struct lidar>();
           previousMillis = millis();
@@ -921,48 +922,13 @@ void setup() {
   Serial.begin(9600);
   delay(500);
 
-
-
-
-
-
-
-
-  /*
-  stepperLeft.setMaxSpeed(300);
-  stepperLeft.setAcceleration(100);
-  stepperLeft.moveTo(1000);
-  stepperRight.setMaxSpeed(200);
-  stepperRight.setAcceleration(100);
-  stepperRight.moveTo(1000);
-  while (stepperLeft.distanceToGo()) {
-
-    stepperLeft.runAndUpdate();
-    stepperRight.runAndUpdate();
-  }
-  Serial.print("done: ");
-  Serial.print(global_x);
-  Serial.print("  ");
-  Serial.println(global_y);
-  Serial.print("suppose:");
-  Serial.println(step_to_dis(1000));
-  */
-  wallFollow();
-  /*
-  stepperLeft.setMaxSpeed(1000);
-  stepperRight.setMaxSpeed(1000);
-  stepperLeft.setSpeed(200);
-  stepperRight.setSpeed(20);
-  */
+  // wallFollow();
 }
 
 void loop() {
 
-  /*
-  stepperLeft.runSpeed();
-  stepperRight.runSpeed();
-  struct lidar data = RPC.call("read_lidars").as<struct lidar>();
+  data = RPC.call("read_lidars").as<struct lidar>();
   delay(10);
-  Serial.println(data.left);
-  */
+
+  print_sensors();
 }
