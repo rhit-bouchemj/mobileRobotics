@@ -223,7 +223,7 @@ float step_to_dis(int step) {
 /*
   Set the current position and step counter to zero
 */
-void set_zero() { 
+void set_zero() {
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
   prev_l_step = 0;
@@ -233,18 +233,52 @@ void set_zero() {
 /*
   Keep track of an update the global positioning of the robot using the motor step counter
 */
+
+unsigned long previousMillisGlobal = millis();
+const unsigned long intervalGlobal = 25;
+
 void updateGlobalPosition() {
-  delta_l_step = stepperLeft.currentPosition() - prev_l_step;
-  delta_r_step = stepperRight.currentPosition() - prev_r_step;
 
-  delta_theta = step_to_dis(delta_r_step - delta_l_step) / wheel_base / 2;
-  global_x = cos(global_theta + delta_theta) * step_to_dis((delta_l_step + delta_r_step) / 2) + global_x;
-  global_y = sin(global_theta + delta_theta) * step_to_dis((delta_l_step + delta_r_step) / 2) + global_y;
+  if (millis() - previousMillisGlobal >= intervalGlobal) {
+    delta_l_step = stepperLeft.currentPosition() - prev_l_step;
+    delta_r_step = stepperRight.currentPosition() - prev_r_step;
 
-  delayMicroseconds(500);  // time for calculation to finish (500 is too much and 100 is too little);
+    delta_theta = step_to_dis(delta_r_step - delta_l_step) / wheel_base;
+    global_x = cos(global_theta + delta_theta) * step_to_dis((delta_l_step + delta_r_step) / 2) + global_x;
+    global_y = sin(global_theta + delta_theta) * step_to_dis((delta_l_step + delta_r_step) / 2) + global_y;
+    global_theta = global_theta + delta_theta;
+    prev_l_step = stepperLeft.currentPosition();
+    prev_r_step = stepperRight.currentPosition();
 
-  prev_l_step = stepperLeft.currentPosition();
-  prev_r_step = stepperRight.currentPosition();
+
+    /*
+    Serial.print("cos: ");
+    Serial.print(cos(global_theta + delta_theta));
+    Serial.print("  ");
+
+    Serial.print("step to dis: ");
+    Serial.print(step_to_dis((delta_l_step + delta_r_step) / 2));
+    Serial.print("  ");
+
+    Serial.print("product ");
+    Serial.print(cos(global_theta + delta_theta) * step_to_dis((delta_l_step + delta_r_step) / 2));
+    Serial.print("  ");
+    
+    Serial.print("delta_l: ");
+    Serial.print(delta_l_step);
+    Serial.print("   ");
+    Serial.print("delta_r: ");
+    Serial.print(delta_r_step);
+    Serial.print("   ");
+
+    Serial.print(global_x);
+    Serial.print("  ");
+    Serial.print(global_y);
+    Serial.print("   ");
+    Serial.println(global_theta);
+    */
+    previousMillisGlobal = millis();
+  }
 }
 
 //Simple Helper Functions
@@ -252,14 +286,182 @@ void updateGlobalPosition() {
 void runAndUpdate(AccelStepper &stepperMotor) {
   stepperMotor.run();
   updateGlobalPosition();
-  }
+}
 
 void runSpeedAndUpdate(AccelStepper &stepperMotor) {
   stepperMotor.runSpeed();
   updateGlobalPosition();
 }
 
+/*
+  The robot will move to a set position, specified by the x and y value
+  TODO: update to be non-blocking
+*/
+void GoToGoal(long x, long y) {
+  stepperLeft.setCurrentPosition(0);
+  stepperRight.setCurrentPosition(0);
 
+  float radian = atan2(y, x);
+  int degree = radian * 57.3;
+  long dis = sqrt(sq(x) + sq(y));
+  if (degree <= 90 && degree >= -90) {
+    spin(degree, 500);
+    delay(50);
+    forward(dis, 300);
+  } else {
+    spin(constrain(degree, -1, 1) * (-180) + degree, 500);
+    delay(50);
+    forward(-dis, 300);
+  }
+}
+
+void smartGoToGoal(int xGoal, int yGoal) {
+  object = 0;
+  int wall = 0;
+  unsigned long previousMillis = 0;
+  const unsigned long interval = 50;
+  previousMillis = millis();
+
+
+  while (true) {
+    while (object) {
+      if (data.front < 15 && data.front) {
+        set_zero();
+        int dis = 120 * 3.14 * wheel_base / 180;
+        int steps = dis_to_step(dis);
+        stepperLeft.moveTo(-steps);
+        stepperLeft.setMaxSpeed(300);
+        stepperLeft.setAcceleration(200);
+        while (!data.right || data.right > 20) {  //nothing on right or more than 15
+
+          runAndUpdate(stepperLeft);
+          if (millis() - previousMillis >= interval) {
+            data = RPC.call("read_lidars").as<struct lidar>();
+            previousMillis = millis();
+            Serial.print("Searching for right: ");
+            Serial.println(data.right);
+          }
+          if (!stepperLeft.distanceToGo()) {
+            break;
+          }
+        }
+        if (data.right && data.right < 20) {
+        } else {
+          pivot(0, -120);
+          object = 0;
+          break;
+        }
+      }
+      if (data.right < 25 && data.right) {
+        stepperLeft.setMaxSpeed(2000);
+        stepperRight.setMaxSpeed(2000);
+        stepperLeft.setSpeed(200);
+        stepperRight.setSpeed(200);
+        int p = data.right;
+        int d = data.right;
+
+        while (data.right && data.right < 25) {
+          stepperLeft.setMaxSpeed(2000);
+          stepperRight.setMaxSpeed(2000);
+          stepperLeft.setSpeed(200);
+          stepperRight.setSpeed(200);
+
+          runSpeedAndUpdate(stepperLeft);
+          runSpeedAndUpdate(stepperRight);
+          if (millis() - previousMillis >= 500) {
+
+            data = RPC.call("read_lidars").as<struct lidar>();
+            d = data.right;            
+            if(!d){
+              break;
+            }
+            if ((p-d) > 0.7) {
+              pivotConst(0, 5, 100);
+            }
+            data = RPC.call("read_lidars").as<struct lidar>();
+            p = data.right;
+            previousMillis = millis();
+          }
+        }  //no more wall on right
+        forward(15, 600);
+      }
+      if (data.left < 25 && data.left) {
+        stepperLeft.setMaxSpeed(2000);
+        stepperRight.setMaxSpeed(2000);
+        stepperLeft.setSpeed(200);
+        stepperRight.setSpeed(200);
+        int p = data.left;
+        int d = data.left;
+
+        while (data.left && data.left < 25) {
+          stepperLeft.setMaxSpeed(2000);
+          stepperRight.setMaxSpeed(2000);
+          stepperLeft.setSpeed(200);
+          stepperRight.setSpeed(200);
+
+          runSpeedAndUpdate(stepperLeft);
+          runSpeedAndUpdate(stepperRight);
+          if (millis() - previousMillis >= 500) {
+
+            data = RPC.call("read_lidars").as<struct lidar>();
+            d = data.left;            
+            if(!d){
+              break;
+            }
+            if ((p-d) > 0.7) {
+              pivotConst(1, -5, 100);
+            }
+            data = RPC.call("read_lidars").as<struct lidar>();
+            p = data.left;
+            previousMillis = millis();
+          }
+        }  //no more wall on left
+        forward(15, 600);
+      }
+      object = 0;
+      break;
+    }
+
+    float delta_x = xGoal - global_x;
+    float delta_y = yGoal - global_y;
+    float radian = atan2(delta_y, delta_x) - global_theta;
+    int degree = radian * 57.3;
+    long dis = sqrt(sq(delta_x) + sq(delta_y));
+    spin(degree, 400);
+
+    set_zero();
+    stepperLeft.moveTo(dis_to_step(dis));
+    stepperRight.moveTo(dis_to_step(dis));
+    stepperLeft.setMaxSpeed(600);
+    stepperRight.setMaxSpeed(600);
+    stepperLeft.setSpeed(400);
+    stepperRight.setSpeed(400);
+
+    while (stepperLeft.distanceToGo()) {
+
+      runSpeedAndUpdate(stepperLeft);
+      runSpeedAndUpdate(stepperRight);
+
+      if (millis() - previousMillis >= interval) {
+
+        data = RPC.call("read_lidars").as<struct lidar>();
+        Serial.print("going to goal: ");
+        Serial.println(data.front);
+        if ((data.front && data.front < 15) || (data.right && data.right < 25) || (data.left && data.left < 25)) {
+          object = 1;
+          break;
+        }
+        previousMillis = millis();
+      }
+    }
+    set_zero();
+    delta_x = xGoal - global_x;
+    delta_y = yGoal - global_y;
+    if (delta_x < 5 && delta_y < 5) {
+      break;
+    }
+  }
+}
 
 
 /*
@@ -267,6 +469,7 @@ void runSpeedAndUpdate(AccelStepper &stepperMotor) {
   Produce a "tank turn" <-- moves both wheels opposite evenly
 */
 void spin(int degree, int speed) {
+  set_zero();
   int offset = 0;
   if (degree < 0) {
     offset = 15 * degree / 90;
@@ -284,14 +487,11 @@ void spin(int degree, int speed) {
   stepperRight.moveTo(steps);
   stepperLeft.moveTo(-steps);
 
-  while(stepperLeft.distanceToGo() != 0 && stepperRight.distanceToGo() != 0)
-  {
-    stepperLeft.run();
-    stepperRight.run();
-  }  
-  stepperLeft.setCurrentPosition(0);
-  stepperRight.setCurrentPosition(0);
-
+  while (stepperLeft.distanceToGo() != 0 && stepperRight.distanceToGo() != 0) {
+    runAndUpdate(stepperLeft);
+    runAndUpdate(stepperRight);
+  }
+  set_zero();
 }
 /*
   Turn in certain degree with certain radius (cm) left of robot is negative
@@ -333,27 +533,6 @@ void forward(int distance, int speed) {
   set_zero();
 }
 
-/*
-  The robot will move to a set position, specified by the x and y value
-  TODO: update to be non-blocking
-*/
-void GoToGoal(long x, long y) {
-  stepperLeft.setCurrentPosition(0);
-  stepperRight.setCurrentPosition(0);
-
-  float radian = atan2(y, x);
-  int degree = radian * 57.3;
-  long dis = sqrt(sq(x) + sq(y));
-  if (degree <= 90 && degree >= -90) {
-    spin(degree, 500);
-    delay(50);
-    forward(dis, 300);
-  } else {
-    spin(constrain(degree, -1, 1) * (-180) + degree, 500);
-    delay(50);
-    forward(-dis, 300);
-  }
-}
 
 /*
   Robot pivot on one wheel. left wheel is 0 and right wheel is 1. degree can be both positive and negative
@@ -380,6 +559,28 @@ void pivot(bool wheel, float degree) {
   set_zero();
 }
 
+void pivotConst(bool wheel, float degree, int speed) {
+  set_zero();
+  int dis = degree * 3.14 * wheel_base / 180;
+  int steps = dis_to_step(dis);
+  if (wheel == 0) {  //pivot on left wheel
+    stepperRight.moveTo(steps);
+    stepperRight.setMaxSpeed(speed + 100);
+    stepperRight.setSpeed(speed);
+    while (stepperRight.distanceToGo()) {
+      runSpeedAndUpdate(stepperRight);
+    }
+  } else {
+    stepperLeft.moveTo(-steps);
+    stepperLeft.setMaxSpeed(speed + 100);
+    stepperLeft.setSpeed(speed);
+    while (stepperLeft.distanceToGo()) {
+      runSpeedAndUpdate(stepperLeft);
+    }
+  }
+  set_zero();
+}
+
 /*
   Prepare to randomly move the robot <-- sets the distance it WILL move
   the robot will move a random amount, at a random speed, and random acceleration
@@ -390,8 +591,8 @@ void prepMovement(int maxVal) {
   if (stepperLeft.distanceToGo() == 0) {
     stepperLeft.setCurrentPosition(2000);
     int randomSteps = random(maxVal) + 5;
-    int randomMaxSpeed = random(maxVal) % 400 + 250;
-    int randomAcc = random(maxVal) % 200 + 150;
+    int randomMaxSpeed = random(maxVal) % 200 + 150;
+    int randomAcc = random(maxVal) % 100 + 150;
     stepperLeft.moveTo(randomSteps);
     stepperLeft.setMaxSpeed(randomMaxSpeed);
     stepperLeft.setAcceleration(randomAcc);
@@ -399,8 +600,8 @@ void prepMovement(int maxVal) {
   if (stepperRight.distanceToGo() == 0) {
     stepperRight.setCurrentPosition(2000);
     int randomSteps = random(maxVal) + 5;
-    int randomMaxSpeed = random(maxVal) % 400 + 250;
-    int randomAcc = random(maxVal) % 200 + 150;
+    int randomMaxSpeed = random(maxVal) % 200 + 150;
+    int randomAcc = random(maxVal) % 100 + 150;
     stepperRight.moveTo(randomSteps);
     stepperRight.setMaxSpeed(randomMaxSpeed);
     stepperRight.setAcceleration(randomAcc);
@@ -412,16 +613,16 @@ void prepMovement(int maxVal) {
   the movement parameters will be equal for both wheels resulting in forward movement
 */
 void prepForward(int maxVal) {
-  if(stepperLeft.distanceToGo() == 0){      
-      int randomSteps = random(maxVal) + 5;
-      int randomMaxSpeed = random(maxVal) % 400 + 250;
-      int randomAcc = random(maxVal) % 200 + 150;
-      stepperLeft.moveTo(randomSteps);
-      stepperLeft.setMaxSpeed(randomMaxSpeed);
-      stepperLeft.setAcceleration(randomAcc);
-      stepperRight.moveTo(randomSteps);
-      stepperRight.setMaxSpeed(randomMaxSpeed);
-      stepperRight.setAcceleration(randomAcc);
+  if (stepperLeft.distanceToGo() == 0) {
+    int randomSteps = random(maxVal) + 5;
+    int randomMaxSpeed = random(maxVal) % 400 + 250;
+    int randomAcc = random(maxVal) % 200 + 150;
+    stepperLeft.moveTo(randomSteps);
+    stepperLeft.setMaxSpeed(randomMaxSpeed);
+    stepperLeft.setAcceleration(randomAcc);
+    stepperRight.moveTo(randomSteps);
+    stepperRight.setMaxSpeed(randomMaxSpeed);
+    stepperRight.setAcceleration(randomAcc);
   }
 }
 
@@ -447,7 +648,7 @@ void randomWanderNoSpin() {
   The distance threshold that determines how close to an object counts is a parameter in the command.
 */
 void collide(int distThresh) {
-  allOff();              //Turn off all LEDs
+  allOff();  //Turn off all LEDs
   // int distThresh = 15;
   while (!object) {      //sensor != close)  //Move forward while not sensing wall
     grnOn();             //Turn on green LED
@@ -483,7 +684,7 @@ void collide(int distThresh) {
 */
 void runAway(int distThresh) {
   int p = 2;
-  int tolerance = distThresh/10;
+  int tolerance = distThresh / 10;
   allOff();
   ylwOn();
   data = RPC.call("read_lidars").as<struct lidar>();
@@ -491,21 +692,19 @@ void runAway(int distThresh) {
   if (data.closestObj < distThresh - tolerance) {  // object present
     delay(100);
     data = RPC.call("read_lidars").as<struct lidar>();  // read again incase of missing data
-    bool FB = 0;                                                     //not on both front and back
-    bool LR = 0;                                                     //not on both left and right
+    bool FB = 0;                                        //not on both front and back
+    bool LR = 0;                                        //not on both left and right
     // int distThresh = 20;
 
 
     if (data.front <= distThresh && data.back <= distThresh && data.back && data.front) {  // both front and back
-      data.front = 0;   //ignore front and back sensor data
+      data.front = 0;                                                                      //ignore front and back sensor data
       data.back = 0;
       FB = 1;
       if (!data.left && !data.right) {  // turn to right sensor and move if free space
-        data.left = 4;    // fake object to left <-- force to right
+        data.left = 4;                  // fake object to left <-- force to right
       }
-    }
-    else
-    {
+    } else {
       if (data.front > distThresh - tolerance) {  // if further then 30 cm, ignore
         data.front = 0;
       }
@@ -516,21 +715,19 @@ void runAway(int distThresh) {
 
     //clear data above threshold
     if (data.left <= distThresh && data.right <= distThresh && data.left && data.right) {  // both left and right
-      data.left = 0;    //ignore left and right sensor data
+      data.left = 0;                                                                       //ignore left and right sensor data
       data.right = 0;
       LR = 1;
       if (!data.front && !data.back) {  // turn to front sensor and move if free space
-        data.back = 4;    // fake object to back
+        data.back = 4;                  // fake object to back
       }
-    }
-    else
-    {
+    } else {
       if (data.left > distThresh - tolerance) {
         data.left = 0;
       }
       if (data.right > distThresh - tolerance) {
         data.front = 0;
-    }
+      }
     }
 
     if (LR && FB) {  //in a box
@@ -539,7 +736,7 @@ void runAway(int distThresh) {
       int xSens = data.front - data.back;  //total X sensor = front - back
       int ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
       GoToGoal((constrain(xSens, -1, 1) * (-distThresh) + xSens) * p, (constrain(ySens, -1, 1) * (-distThresh) + ySens) * p);
-      
+
       /*Test sense data
       Serial.println(xSens);
       Serial.println(ySens);
@@ -548,8 +745,8 @@ void runAway(int distThresh) {
       Serial.println("-----");
       delay(500);
       */
-  
-      if(data.closestObj >= distThresh - tolerance)    //check if object in threshold to leave loops
+
+      if (data.closestObj >= distThresh - tolerance)  //check if object in threshold to leave loops
       {
         object = 0;
       }
@@ -569,22 +766,22 @@ void follow(int distance) {
   ylwOn();
   grnOn();
   data = RPC.call("read_lidars").as<struct lidar>();
-  while(data.front){  //object in front of robot
+  while (data.front) {  //object in front of robot
     data = RPC.call("read_lidars").as<struct lidar>();
 
-    stepperLeft.setCurrentPosition(0);    //reset world position
+    stepperLeft.setCurrentPosition(0);  //reset world position
     stepperRight.setCurrentPosition(0);
 
-    int delta = data.front - distance;        // difference between intended distance and actual
-    if(delta < 2 && delta > -2)   //deadzone creation
+    int delta = data.front - distance;  // difference between intended distance and actual
+    if (delta < 2 && delta > -2)        //deadzone creation
     {
       delta = 0;
     }
     int sign = constrain(delta, -1, 1);
-    stepperLeft.moveTo(sign*5000);   // determine if moving forward or backword based on delta
-    stepperRight.moveTo(sign*5000);
-    stepperLeft.setSpeed(constrain(sign*sq(delta)*25, -700, 700));
-    stepperRight.setSpeed(constrain(sign*sq(delta)*25, -700, 700));
+    stepperLeft.moveTo(sign * 5000);  // determine if moving forward or backword based on delta
+    stepperRight.moveTo(sign * 5000);
+    stepperLeft.setSpeed(constrain(sign * sq(delta) * 25, -700, 700));
+    stepperRight.setSpeed(constrain(sign * sq(delta) * 25, -700, 700));
     stepperRight.run();
     stepperLeft.run();
   }
@@ -600,8 +797,7 @@ void smartWander(int collideDist, int runDist) {
   allOff();
   collide(collideDist);
   delay(100);
-  while(object)
-  {
+  while (object) {
     runAway(runDist);
   }
 }
@@ -614,10 +810,10 @@ void smartWander(int collideDist, int runDist) {
   The inputs are the distance to measure for collision and the distance to measure for following
 */
 void smartFollow(int collideDist, int followDist) {
-  allOff();               //Turn off all LEDs
+  allOff();  //Turn off all LEDs
   collide(collideDist);
   delay(100);
-  follow(followDist);     //
+  follow(followDist);  //
 }
 
 /*
@@ -625,18 +821,18 @@ void smartFollow(int collideDist, int followDist) {
   Wall = 1<-- Front, 2<-- Back, 3<-- left, 4<-- right
 */
 bool wallFollow() {
-  // int a = 3;
   data = RPC.call("read_lidars").as<struct lidar>();
   unsigned long previousMillis = 0;
   const unsigned long interval = 500;
   float d = 0;
   float p = 0;
-  
   if (data.left && data.left <= 15) { //TODO: does data.left still work if float? does 0.1 count as true?
     getParallel(3);
   } else if (data.right && data.right <= 15) {
     getParallel(4);
   } else if (data.front && data.front <= 15) {
+    getParallel(1);
+  } else {
     getParallel(1);
   }
   delay(500);
@@ -661,7 +857,7 @@ bool wallFollow() {
       if (data.right && data.right < 15){ //if wall to left and right
         upperThresh = (data.left + data.right)/2 + 2;   //TODO: avg??
         lowerThresh = upperThresh - 5;
-      }else{
+      } else {
         upperThresh = 15;
         lowerThresh = 10;
       }
@@ -691,23 +887,30 @@ bool wallFollow() {
       }
       if (millis() - previousMillis >= interval) {  // if elapsed time has reached set interval
         data = RPC.call("read_lidars").as<struct lidar>();
-        if (data.front && data.front < 10) {  // if left wall + front wall <-- Red + Green LED
+        if (data.front && data.front < 10) {  // wall front     if left wall + front wall <-- Red + Green LED
           redOn();
           grnOn();
-          pivot(1, 90);   // pivot right CCW
-          pivot(0, -90);  // pivot left CW
-          pivot(1, -90);  // pivot right CW
-          forward(-30, 500);  //move backward into corner; All combined this will pivot the robot to the right and tuck into the corner
-          redOff();
-          grnOff();
-          getParallel(3);   
-          data = RPC.call("read_lidars").as<struct lidar>(); // FIXME: move update data
+          if (data.right && data.right < 15) {
+            forward(-20, 700);
+            spin(180, 300);
+          } else {
+
+
+            pivot(1, 90);   // pivot right CCW 
+            pivot(0, -90);  // pivot left CW
+            pivot(1, -90);  // pivot right CW
+            forward(-30, 500);  //move backward into corner; All combined this will pivot the robot to the right and tuck into the corner
+            redOff();
+            grnOff();
+            getParallel(3);
+          }
+          data = RPC.call("read_lidars").as<struct lidar>();  // FIXME: move update data
           d = data.left;
           p = data.left;
         }
-        if (data.left == 0) {  //lost wall on left
-          pivot(0, 90);   //pivot left CCW
-          forward(30, 300);  // move forward (looking for wall because might be an outer corner)
+        if (data.left == 0 || data.left > 25) {  //lost wall on left
+          pivot(0, 90);       //pivot left CCW
+          forward(30, 500);   // move forward (looking for wall because might be an outer corner)
           data = RPC.call("read_lidars").as<struct lidar>();
           if (data.left == 0) {   //if no wall on left still (lost wall)
             return false;
@@ -743,10 +946,10 @@ bool wallFollow() {
 
     previousMillis = millis();
     while (d) {
-      if (data.left && data.left < 15){
-        upperThresh = (data.left + data.right)/2 + 2;
+      if (data.left && data.left < 15) {
+        upperThresh = (data.left + data.right) / 2 + 2;
         lowerThresh = upperThresh - 5;
-      }else{
+      } else {
         upperThresh = 15;
         lowerThresh = 10;
       }
@@ -780,18 +983,24 @@ bool wallFollow() {
         if (data.front && data.front < 10) {
           redOn();
           grnOn();
-          // Helper func <-- TurnInnerCorner
-          pivot(0, -90);
-          pivot(1, 90);
-          pivot(0, 90);
-          forward(-30, 500);
-          getParallel(4);
+          if (data.left && data.left < 25) {
+            forward(-20, 700);
+            spin(180, 300);
+          } else {
+            // Helper func <-- TurnInnerCorner
+            pivot(0, -90);
+            pivot(1, 90);
+            pivot(0, 90);
+            forward(-30, 500);
+            getParallel(4);
+          }
+
           data = RPC.call("read_lidars").as<struct lidar>();
           d = data.right;
           p = data.right;
           allOff();
         }
-        if (data.right == 0) {  //lost wall on right
+        if (data.right == 0 || data.right > 25) {  //lost wall on right
           pivot(1, -90);
           forward(30, 300);
           data = RPC.call("read_lidars").as<struct lidar>();
@@ -887,7 +1096,7 @@ void getParallel(int location) {
     pre = pre + data.left;
     pre = pre / 3;
     int offset = 5;
-    forward(offset, 300);
+    forward(offset, 500);
     delay(500);
     data = RPC.call("read_lidars").as<struct lidar>();
     float curr = data.left;
@@ -962,6 +1171,10 @@ void getParallel(int location) {
 }
 
 float minLidar(float frontL, float backL, float leftL, float rightL) {
+  Serial.print(data.front);
+  Serial.print(data.back);
+  Serial.print(data.left);
+  Serial.println(data.right);
   float ldrs[4];
   ldrs[0] = frontL;
   ldrs[1] = backL;
@@ -995,18 +1208,18 @@ void randomWanderWallFollow() {
     updateGlobalPosition();
     if (millis() - previousMillis >= interval) {
       data = RPC.call("read_lidars").as<struct lidar>();
-      previousMillis = millis();      
+      previousMillis = millis();
     }
 
     if (minLidar(data.front, data.back, data.left, data.right) < distThresh) {
       object = 1;
       grnOff();
     }
-
   }
   wallFollow();
   object = 0;
 }
+
 
 
 void setup() {
@@ -1014,14 +1227,30 @@ void setup() {
   init_stepper();
 
   Serial.begin(9600);
-  delay(500);
+  delay(5000);
+
+  smartGoToGoal(200, 0);
+  //smartGoToGoal(200, 100);
+
+  //pivot(0, 90);
 
   // wallFollow();
 }
 
 void loop() {
-  randomWanderWallFollow();
-/*
+  /*
+  if (millis() - previousMillis >= interval) {
+        
+        data = RPC.call("read_lidars").as<struct lidar>();
+        Serial.print("going to goal: ");
+        Serial.println(data.front);
+        if (minLidar(data.front, data.back, data.left, data.right) < 10) {
+          object = 1;
+        }
+        previousMillis = millis();
+      }
+  //randomWanderWallFollow();
+  /*
   data = RPC.call("read_lidars").as<struct lidar>();
   delay(10);
 
