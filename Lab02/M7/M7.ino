@@ -1,8 +1,17 @@
-//Justin Dewitt 12.12.23
-// read about multicore: https://docs.arduino.cc/tutorials/giga-r1-wifi/giga-dual-core
-//This code will show how to run the same code on the M4 and M7 to server and client, respectively
-//M4 will read sensor data and send to M7 to run the state machine
+/*
+  Made by: Everest Zhang and Mitch Boucher
+  Created: 1/?/2025
+  Modified last: 1/18/2025
 
+  This program is made to complete lab 2 of ECE425
+  This includes:
+  Randomly Wandering
+  Detecting collisions with objects
+  Following an object in front of the robot at a set distance
+  Running away from an object proportionally to the distance to the object
+  A state machine that changes between randomly wandering and running away when an object is detected within a distance threshold
+  A state machine that changes between randomly wandering and following when an object is detected within a distance threshold
+*/
 #include "Arduino.h"
 #include "RPC.h"
 #include <AccelStepper.h>  //include the stepper motor library
@@ -180,7 +189,9 @@ void init_stepper() {
   digitalWrite(enableLED, HIGH);               //turn on enable LED
 }
 
-//convert travel distance (cm) to steps
+/*
+  convert travel distance (cm) to steps
+*/
 int dis_to_step(int dis) {
   int step = dis * 360 / (3.14 * wheel_width * 0.45);
   return step;
@@ -206,6 +217,10 @@ void runToStop(void) {
   }
 }
 
+/*
+  Turn the robot a number of degrees at a specified speed
+  Produce a "tank turn" <-- moves both wheels opposite evenly
+*/
 void spin(int degree, int speed) {
   int offset = 0;
   if (degree < 0) {
@@ -216,14 +231,6 @@ void spin(int degree, int speed) {
   int signOfDegree = constrain(degree, -1, 1);
   int dis = degree * 3.14 * wheel_base / (2 * 180);
   int steps = dis_to_step(dis);  //+ offset;
-  // stepperLeft.setMaxSpeed(speed);
-  // stepperLeft.setAcceleration(100.0);
-  // stepperLeft.runToNewPosition(-steps);
-  // stepperRight.setMaxSpeed(speed);
-  // stepperRight.setAcceleration(100.0);
-  // stepperRight.runToNewPosition(steps);
-  // steppers.runSpeedToPosition();
-
   stepperLeft.setMaxSpeed(speed);
   stepperRight.setMaxSpeed(speed);
   stepperLeft.setAcceleration(100.0);
@@ -242,6 +249,10 @@ void spin(int degree, int speed) {
 
 }
 
+/*
+  Move the robot forward by a set distance (in cm) at a set speed
+  A negative distance will result in a reverse movment
+*/
 void forward(int distance, int speed) {
   int steps = dis_to_step(distance);
   stepperRight.moveTo(steps);
@@ -255,6 +266,9 @@ void forward(int distance, int speed) {
   stepperRight.setCurrentPosition(0);
 }
 
+/*
+  Move the robot backward by a set distance (in cm) at a set speed
+*/
 void reverse(int distance, int speed) {
   int steps = dis_to_step(distance);
   stepperRight.moveTo(-steps);
@@ -268,6 +282,11 @@ void reverse(int distance, int speed) {
   stepperRight.setCurrentPosition(0);
 }
 
+
+/*
+  The robot will move to a set position, specified by the x and y value
+  TODO: update to be non-blocking
+*/
 void GoToGoal(long x, long y) {
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
@@ -286,6 +305,13 @@ void GoToGoal(long x, long y) {
   }
 }
 
+
+/*
+  Prepare to randomly move the robot <-- sets the distance it WILL move
+  the robot will move a random amount, at a random speed, and random acceleration
+  The randomness of the robot is restricted to the input of maxVal
+  Non-blocking way of setting movment, 
+*/
 void prepMovement(int maxVal) {
   if (stepperLeft.distanceToGo() == 0) {
     stepperLeft.setCurrentPosition(2000);
@@ -325,6 +351,12 @@ void prepForward(int maxVal) {
   }
 }
 
+
+/*
+  The robot will randomly wander around
+  The type of random wandering is determined by each wheel independently getting a distance to travel, at a random speed and acceleration
+  The distance, speed, and acceleration random value is limited by the constant maxValue
+*/
 void randomWanderNoSpin() {
   allOff();
   grnOn();  //turnx on green LED
@@ -435,15 +467,16 @@ void runAway(int distThresh) {
       int ySens = data.left - data.right;  //total Y sensor = left - right <-- Based on directions listed in lab 1
       GoToGoal((constrain(xSens, -1, 1) * (-distThresh) + xSens) * p, (constrain(ySens, -1, 1) * (-distThresh) + ySens) * p);
       
-      //Test sense data
-      // Serial.println(xSens);
-      // Serial.println(ySens);
-      // Serial.println(constrain(xSens, -1, 1) * (-30) + xSens);
-      // Serial.println(constrain(ySens, -1, 1) * (-30) + ySens);
-      // Serial.println("-----");
-      // delay(500);
+      /*Test sense data
+      Serial.println(xSens);
+      Serial.println(ySens);
+      Serial.println(constrain(xSens, -1, 1) * (-30) + xSens);
+      Serial.println(constrain(ySens, -1, 1) * (-30) + ySens);
+      Serial.println("-----");
+      delay(500);
+      */
   
-      if(data.closeObj >= distThresh - tolerance)    //check if object in threshold to leave loops
+      if(data.closestObj >= distThresh - tolerance)    //check if object in threshold to leave loops
       {
         object = 0;
       }
@@ -481,16 +514,16 @@ void follow(int distance) {
     stepperRight.setSpeed(constrain(sign*sq(delta)*25, -700, 700));
     stepperRight.run();
     stepperLeft.run();
-
-    // Test Delta data
-    // Serial.print(constrain(delta, -1, 1)*5000);
-    // Serial.print("  ");
-    // Serial.print(delta);
-    // Serial.print("  ");
-    // Serial.println(data.front);
   }
 }
 
+
+/*
+  Randomly wander the robot until an object is detected
+  Once an object is detected stop the robot using the collide command
+  While there is an object within the running threshold, run away from the object
+  The inputs are the distance to measure for collision and the distance to measure for when to run away 
+*/
 void smartWander(int collideDist, int runDist) {
   allOff();
   collide(collideDist);
@@ -501,6 +534,13 @@ void smartWander(int collideDist, int runDist) {
   }
 }
 
+/*
+  Randomly wander the robot until an object is detected
+  Once an object is detected stop the robot using the collide command
+  Begin following the object that stopped the robot
+  If the followed object is no longer detected, return to randomly wandering
+  The inputs are the distance to measure for collision and the distance to measure for following
+*/
 void smartFollow(int collideDist, int followDist) {
   allOff();               //Turn off all LEDs
   collide(collideDist);

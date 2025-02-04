@@ -625,14 +625,14 @@ void smartFollow(int collideDist, int followDist) {
   Wall = 1<-- Front, 2<-- Back, 3<-- left, 4<-- right
 */
 bool wallFollow() {
-  int a = 3;
+  // int a = 3;
   data = RPC.call("read_lidars").as<struct lidar>();
   unsigned long previousMillis = 0;
   const unsigned long interval = 500;
   float d = 0;
   float p = 0;
   
-  if (data.left && data.left <= 15) {
+  if (data.left && data.left <= 15) { //TODO: does data.left still work if float? does 0.1 count as true?
     getParallel(3);
   } else if (data.right && data.right <= 15) {
     getParallel(4);
@@ -643,77 +643,77 @@ bool wallFollow() {
   data = RPC.call("read_lidars").as<struct lidar>();
   int wall = 0;  // 3 left, 4 right
 
-  if (data.left && data.left < 15) {
-    wall = 3;
+  if (data.left && data.left < 15) {  //prioritizes left wall over right if both
+    wall = 3; //exists wall to Left
   } else if (data.right && data.right < 15) {
-    wall = 4;
+    wall = 4; //exists wall to right
   }
 
-  if (wall == 3) {
+  if (wall == 3) {  //Wall to left
     delay(50);
     int upperThresh = 15;
     int lowerThresh = 10;
     data = RPC.call("read_lidars").as<struct lidar>();
     d = data.left;
     p = data.left;
-    previousMillis = millis();
+    previousMillis = millis();  // Timer for arduino (return current time)
     while (d) {
-      if (data.right && data.right < 15){
-        upperThresh = (data.left + data.right)/2 + 2;
+      if (data.right && data.right < 15){ //if wall to left and right
+        upperThresh = (data.left + data.right)/2 + 2;   //TODO: avg??
         lowerThresh = upperThresh - 5;
       }else{
         upperThresh = 15;
         lowerThresh = 10;
       }
-      if (d > 15) {
+      if (d > 15) {   // Too far from wall <-- red LED
         redOn();
-        pivot(0, 30);
-        pivot(1, -30);
+        pivot(0, 30);   //pivot left
+        pivot(1, -30);  //pivot right  (To get back to being parallel, but closer to wall)
         redOff();
-        data = RPC.call("read_lidars").as<struct lidar>();
-        d = data.left;
+        data = RPC.call("read_lidars").as<struct lidar>();  //FIXME: move update data 
+        d = data.left;  
         p = data.left;
-      } else if (d < 10) {
+      } else if (d < 10) {    // Too close to wall <-- Yellow LED
         ylwOn();
-        pivot(1, -30);
-        pivot(0, 30);
+        pivot(1, -30);    //pivot right
+        pivot(0, 30);     //pivot left 
         ylwOff();
-        data = RPC.call("read_lidars").as<struct lidar>();
+        data = RPC.call("read_lidars").as<struct lidar>();  //FIXME: move update data 
         d = data.left;
         p = data.left;
-      } else {
-        stepperLeft.setMaxSpeed(2000);
+      } else {  //if in good deadzone, go forward at speed 
+        stepperLeft.setMaxSpeed(2000);  // FIXME: can turn into function
         stepperRight.setMaxSpeed(2000);
         stepperLeft.setSpeed(200);
         stepperRight.setSpeed(200);
         runSpeedAndUpdate(stepperLeft);
         runSpeedAndUpdate(stepperRight);
       }
-      if (millis() - previousMillis >= interval) {
+      if (millis() - previousMillis >= interval) {  // if elapsed time has reached set interval
         data = RPC.call("read_lidars").as<struct lidar>();
-        if (data.front && data.front < 10) {
+        if (data.front && data.front < 10) {  // if left wall + front wall <-- Red + Green LED
           redOn();
           grnOn();
-          pivot(1, 90);
-          pivot(0, -90);
-          pivot(1, -90);
-          forward(-30, 500);
+          pivot(1, 90);   // pivot right CCW
+          pivot(0, -90);  // pivot left CW
+          pivot(1, -90);  // pivot right CW
+          forward(-30, 500);  //move backward into corner; All combined this will pivot the robot to the right and tuck into the corner
           redOff();
           grnOff();
-          getParallel(3);
-          data = RPC.call("read_lidars").as<struct lidar>();
+          getParallel(3);   
+          data = RPC.call("read_lidars").as<struct lidar>(); // FIXME: move update data
           d = data.left;
           p = data.left;
         }
         if (data.left == 0) {  //lost wall on left
-          pivot(0, 90);
-          forward(30, 300);
+          pivot(0, 90);   //pivot left CCW
+          forward(30, 300);  // move forward (looking for wall because might be an outer corner)
           data = RPC.call("read_lidars").as<struct lidar>();
-          if (data.left == 0) {
+          if (data.left == 0) {   //if no wall on left still (lost wall)
             return false;
           }
           getParallel(3);
-          data = RPC.call("read_lidars").as<struct lidar>();
+          data = RPC.call("read_lidars").as<struct lidar>();  // FIXME: move update data
           d = data.left;
           p = data.left;
         }
@@ -721,20 +721,19 @@ bool wallFollow() {
         int i = 0;
 
         while (i < 500) {
-
           stepperLeft.setMaxSpeed(2000);
           stepperRight.setMaxSpeed(2000);
-          stepperLeft.setSpeed(200 - (d - p) * 50);
+          stepperLeft.setSpeed(200 - (d - p) * 50);   //only function that uses d & p
           stepperRight.setSpeed(200 + (d - p) * 50);
           runSpeedAndUpdate(stepperLeft);
           runSpeedAndUpdate(stepperRight);
           i = i + 1;
         }
-        p = d;
-        previousMillis = millis();
+        p = d;    // set previous to the current distance
+        previousMillis = millis();    // previous timestamp
       }
     }
-  } else if (wall == 4) {
+  } else if (wall == 4) {   //wall on Right
     delay(50);
     int upperThresh = 15;
     int lowerThresh = 10;
