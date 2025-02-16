@@ -1015,19 +1015,6 @@ void smartFollow(int collideDist, int followDist)
   follow(followDist); //
 }
 
-// Mapping + Localization
-
-char moves[16] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
-int occGrid[6][6] = {'99', '99', '99', '99', '99', '99',
-                     '99', '0', '0', '0', '0', '99',
-                     '99', '0', '0', '0', '0', '99',
-                     '99', '0', '0', '0', '0', '99',
-                     '99', '0', '0', '0', '0', '99',
-                     '99', '99', '99', '99', '99', '99' };
-int startX; // changes to current X per loop (1-4)
-int startY; // changes to current Y per loop (1-4)
-int goalX;  // Never changes (1-4)
-int goalY;  // Never changes (1-4)
 
 /*
   Using the pregenerated occupancy grid, calculate a route to make it to the goal
@@ -1037,76 +1024,143 @@ int goalY;  // Never changes (1-4)
   startY - the current Y position of the robot
   goalX - the final X position of the robot
   goalY - the final Y position of the robot
+  occGrid[6][6] - Occupancy grid, 0 = unoccupied, 99 = occupied
   *moveList - char array of the list of moves necessary
   currentMoveNumber - current number of moves made (call @ 0 always)
 */
-// TODO: need to change to hold a pointer to return an array of the moveList
-// TODO: Movelist values = 1-4? (Up/Down/Right/Left)
-// OUTPUT = moveList parameter
+//global flag for NavMaze
+bool doneFlag = false;
 void navMaze(int startX, int startY, int goalX, int goalY, int occGrid[][6], char *moveList, int currentMoveNumber)
 {
   int diffX = goalX - startX;
   int diffY = goalY - startY;
-  // xDirWant = constrain(diffX, -1, 1); // Limit to 1 block for next step
-  // yDirWant = constrain(diffY, -1, 1);
   char previousMove = 'X';
-  if (currentMoveNumber != 0)
+  if (currentMoveNumber != 0) // get Previous move from last iteration successful <-- will jump if goes backmultiple moves
   {
     previousMove = moveList[currentMoveNumber - 1];
   }
 
+  // if reached goal set flag to true <-- starts pulling out of all iterations
   if (diffX == 0 && diffY == 0)
   {
+    doneFlag = true;
+  }
+
+  // pull-out if done
+  if (doneFlag)
     return;
+
+  // Move in desired X direction
+  if (diffX < 0 && occGrid[startY][startX - 1] == 0 && previousMove != 'R')
+  {
+    pathSpace(-1, 0, currentMoveNumber, moveList);
+    navMaze(startX - 1, startY, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
   }
-    // Move in desired X direction
-    if (diffX < 0 && occGrid[startY][startX - 1] == 0 && previousMove != 'R')
-    {
-        moveSpace(-1, 0, currentMoveNumber, moveList);
-        navMaze(startX - 1, startY, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
-    }
-    else if (diffX > 0 && occGrid[startY][startX + 1] == 0 && previousMove != 'L')
-    {
-        moveSpace(1, 0, currentMoveNumber, moveList);
-        navMaze(startX + 1, startY, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
-    }
+  else if (diffX > 0 && occGrid[startY][startX + 1] == 0 && previousMove != 'L')
+  {
+    pathSpace(1, 0, currentMoveNumber, moveList);
+    navMaze(startX + 1, startY, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
+  }
 
-    // Move in desired Y direction
-    if (diffY < 0 && occGrid[startY - 1][startX] == 0 && previousMove != 'D')
-    {
-        moveSpace(0, -1, currentMoveNumber, moveList);
-        navMaze(startX, startY - 1, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
-    }
-    else if (diffY > 0 && occGrid[startY + 1][startX] == 0 && previousMove != 'U')
-    {
-        moveSpace(0, 1, currentMoveNumber, moveList);
-        navMaze(startX, startY + 1, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
-    }
+  // pull-out if done
+  if (doneFlag)
+    return;
 
-//
-void moveSpace(int xDir, int yDir, int currMove, char *moveList)
+  // Move in desired Y direction
+  if (diffY < 0 && occGrid[startY - 1][startX] == 0 && previousMove != 'D')
+  {
+    pathSpace(0, -1, currentMoveNumber, moveList);
+    navMaze(startX, startY - 1, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
+  }
+  else if (diffY > 0 && occGrid[startY + 1][startX] == 0 && previousMove != 'U')
+  {
+    pathSpace(0, 1, currentMoveNumber, moveList);
+    navMaze(startX, startY + 1, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
+  }
+
+  // Move pseudorandomly (you must leave the goal to reach the goal - Sun Tzu)
+  // Try to Move right
+  if (!doneFlag && occGrid[startY][startX + 1] == 0 && previousMove != 'L') // space must be free AND didn't move exact opposite last turn
+  {
+    pathSpace(1, 0, currentMoveNumber, moveList);
+    navMaze(startX + 1, startY, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
+  }
+  // Try to Move left
+  if (!doneFlag && occGrid[startY][startX - 1] == 0 && previousMove != 'R')
+  {
+    pathSpace(-1, 0, currentMoveNumber, moveList);
+    navMaze(startX - 1, startY, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
+  }
+  // Try to Move up
+  if (!doneFlag && occGrid[startY - 1][startX] == 0 && previousMove != 'D')
+  {
+    pathSpace(0, -1, currentMoveNumber, moveList);
+    navMaze(startX, startY - 1, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
+  }
+  // Try to Move down
+  if (!doneFlag && occGrid[startY + 1][startX] == 0 && previousMove != 'U')
+  {
+    pathSpace(0, 1, currentMoveNumber, moveList);
+    navMaze(startX, startY + 1, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
+  }
+  return; //dead-end
+}
+
+/*
+  Add the char related to a certain move to the moveList <-- tracks good moves
+*/
+void pathSpace(int xDir, int yDir, int currMove, char *moveList)
 {
-  if (xDir > 0)
+    if (xDir > 0) moveList[currMove] = 'R';         // Right
+    else if (xDir < 0) moveList[currMove] = 'L';    // Left
+    else if (yDir > 0) moveList[currMove] = 'D';    // Down
+    else if (yDir < 0) moveList[currMove] = 'U';    // Up
+    else moveList[currMove] = 'X';                  // N/A
+}
+
+//Helper Functions of path finding
+/*
+  Print out the 2D array occupancy grid to serial terminal for debugging
+*/
+void printOccGrid(int occGrid[][6])
+{
+    Serial.println("Occupancy Grid:");
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            Serial.print(occGrid[i][j]);
+            Serial.print(" ");
+        }
+        Serial.println();
+    }
+}
+
+/*
+  Print out the list of moves as an array to serial terminal for debugging
+*/
+void printMoves(char *moveList, int length)
+{
+    for (int i = 0; i < length; i++)
+    {
+        Serial.print(moveList[i]);
+        Serial.print(" ");
+    }
+    Serial.println();
+}
+
+/*
+
+*/
+void moveThroughMaze(char *moveList, int gridSize = 16)
+{
+  for(int i = 0; i < 16; i++)
   {
-    moveList[currMove] = 'R';
-  }
-  else if (xDir < 0)
-  {
-    moveList[currMove] = 'L';
-  }
-  else if (yDir > 0)
-  {
-    moveList[currMove] = 'D';
-  }
-  else if (yDir < 0)
-  {
-    moveList[currMove] = 'U';
-  }
-  else
-  {
-    moveList[currMove] = 'X';
+
   }
 }
+
+
 
 void setup()
 {
@@ -1115,8 +1169,19 @@ void setup()
 
   Serial.begin(9600);
   delay(5000);
+  char moves[16] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
+  int occGrid[6][6] = {'99', '99', '99', '99', '99', '99',
+                     '99', '0', '0', '0', '0', '99',
+                     '99', '0', '0', '0', '0', '99',
+                     '99', '0', '0', '0', '0', '99',
+                     '99', '0', '0', '0', '0', '99',
+                     '99', '99', '99', '99', '99', '99'};
+  int startX = 1; // changes to current X per loop (1-4)
+  int startY = 1; // changes to current Y per loop (1-4)
+  int goalX = 4;  // Never changes (1-4)
+  int goalY = 4;  // Never changes (1-4)
 
-  navMaze(1, 1,4, 4, occGrid, moveList, 0)
+  navMaze(startX, startY, goalX, goalY, occGrid, moves, 0);
 }
 
 void loop()
