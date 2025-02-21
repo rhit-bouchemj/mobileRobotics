@@ -255,7 +255,7 @@ void init_stepper()
 /*
   convert travel distance (cm) to steps
 */
-int dis_to_step(int dis)
+int dis_to_step(float dis)
 {
   int step = dis * 360 / (3.14 * wheel_width * 0.45);
   return step;
@@ -361,33 +361,41 @@ int getLidarValue(const String &side)
     return data.right; // Default to right if invalid input
 }
 
-void getParallel(int location) {
-  float goal_dis = 15.0;  //cm
+void getParallel(int location)
+{
+  float goal_dis = 15.0; // cm
   unsigned long previousMillis = 0;
   const unsigned long interval = 50;
   struct lidar data = RPC.call("read_lidars").as<struct lidar>();
-  if (location == 1 || location == 2) {  //pivot 90 or till right sensor find the wall; then pivot the other way till left sensor find the wall
+  if (location == 1 || location == 2)
+  { // pivot 90 or till right sensor find the wall; then pivot the other way till left sensor find the wall
     set_zero();
     int dis = 90 * 3.14 * wheel_base / 180;
     int steps = dis_to_step(dis);
     stepperLeft.moveTo(-steps);
     stepperLeft.setMaxSpeed(200);
     stepperLeft.setAcceleration(200);
-    while (!data.right || data.right > 15) {  //nothing on right or more than 15
+    while (!data.right || data.right > 15)
+    { // nothing on right or more than 15
       runAndUpdate(stepperLeft);
-      if (millis() - previousMillis >= interval) {
+      if (millis() - previousMillis >= interval)
+      {
         data = RPC.call("read_lidars").as<struct lidar>();
         previousMillis = millis();
       }
-      if (!stepperLeft.distanceToGo()) {
+      if (!stepperLeft.distanceToGo())
+      {
         break;
       }
     }
     // finish
-    if (data.right) {  //if there is a wall on the right, jump to location = 4
+    if (data.right)
+    { // if there is a wall on the right, jump to location = 4
       location = 4;
-    } else {
-      pivot(1, -90);  // pivot back
+    }
+    else
+    {
+      pivot(1, -90); // pivot back
       set_zero();
       int dis = -90 * 3.14 * wheel_base / 180;
       int steps = dis_to_step(dis);
@@ -395,23 +403,28 @@ void getParallel(int location) {
       stepperRight.setMaxSpeed(200);
       stepperRight.setAcceleration(200);
 
-      while (!data.left || data.left > 15) {  //nothing on left
+      while (!data.left || data.left > 15)
+      { // nothing on left
         runAndUpdate(stepperRight);
-        if (millis() - previousMillis >= interval) {
+        if (millis() - previousMillis >= interval)
+        {
           data = RPC.call("read_lidars").as<struct lidar>();
           previousMillis = millis();
         }
-        if (!stepperRight.distanceToGo()) {
+        if (!stepperRight.distanceToGo())
+        {
           break;
         }
       }
 
-      if (data.left) {
+      if (data.left)
+      {
         location = 3;
       }
     }
   }
-  if (location == 3) {  // wall on left
+  if (location == 3)
+  { // wall on left
     delay(500);
     data = RPC.call("read_lidars").as<struct lidar>();
     float pre = data.left;
@@ -434,8 +447,8 @@ void getParallel(int location) {
     data = RPC.call("read_lidars").as<struct lidar>();
     curr = curr + data.left;
     curr = curr / 3;
-    float a = float(offset) * curr / (pre - curr);                   //positive if going towards, negative if going away
-    float theta = atan2(curr, abs(a)) * 57.3 * constrain(a, -1, 1);  //in degree
+    float a = float(offset) * curr / (pre - curr);                  // positive if going towards, negative if going away
+    float theta = atan2(curr, abs(a)) * 57.3 * constrain(a, -1, 1); // in degree
     float delta = (-1) * a * (goal_dis - curr) / curr;
     Serial.print(pre);
     Serial.print("  ");
@@ -444,16 +457,21 @@ void getParallel(int location) {
     Serial.print(delta);
     Serial.print("  ");
     Serial.println(theta);
-    if (abs(theta) > 5) {
+    if (abs(theta) > 5)
+    {
       forward(delta, 300);
     }
-    if (delta > 0) {
+    if (delta > 0)
+    {
       pivot(1, -theta);
-    } else {
+    }
+    else
+    {
       pivot(0, -theta);
     }
   }
-  if (location == 4) {
+  if (location == 4)
+  {
     delay(500);
     data = RPC.call("read_lidars").as<struct lidar>();
     float pre = data.right;
@@ -476,8 +494,8 @@ void getParallel(int location) {
     data = RPC.call("read_lidars").as<struct lidar>();
     curr = curr + data.right;
     curr = curr / 3;
-    float a = float(offset) * curr / (pre - curr);                          //positive if going towards, negative if going away
-    float theta = atan2(curr, abs(a)) * 57.3 * constrain(a, -1, 1) * (-1);  //in degree, opposite of wall on left
+    float a = float(offset) * curr / (pre - curr);                         // positive if going towards, negative if going away
+    float theta = atan2(curr, abs(a)) * 57.3 * constrain(a, -1, 1) * (-1); // in degree, opposite of wall on left
     float delta = (-1) * a * (goal_dis - curr) / curr;
     Serial.print(pre);
     Serial.print("  ");
@@ -486,30 +504,60 @@ void getParallel(int location) {
     Serial.print(delta);
     Serial.print("  ");
     Serial.println(theta);
-    if (abs(theta) > 5) {  //only do this if the robot is really not parallel
+    if (abs(theta) > 5)
+    { // only do this if the robot is really not parallel
       forward(delta, 200);
     }
-    if (delta > 0) {
+    if (delta > 0)
+    {
       pivot(1, -theta);
-    } else {
+    }
+    else
+    {
       pivot(0, -theta);
     }
   }
 }
 
+/*
+  The robot will move to a set position, specified by the x and y value
+  TODO: update to be non-blocking
+*/
+void goToGoal(long x, long y)
+{
+  stepperLeft.setCurrentPosition(0);
+  stepperRight.setCurrentPosition(0);
+
+  // float correctionFactor = 0.95;
+  float radian = atan2(y, x);
+  int degree = radian * 57.3;
+  long dis = sqrt(sq(x) + sq(y));
+  if (degree <= 90 && degree >= -90)
+  {
+    spin(degree, 500);
+    delay(50);
+    forward(dis, 300);
+  }
+  else
+  {
+    spin(constrain(degree, -1, 1) * (-180) + degree, 500);
+    delay(50);
+    forward(-dis, 300);
+  }
+}
 
 /*
   The robot will move to a set position, specified by the x and y value
   TODO: update to be non-blocking
 */
-void GoToGoal(long x, long y)
+void goToGoalWithReturn(long x, long y)
 {
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
 
-  float correctionFactor = 0.95;
+  // float correctionFactor = 0.95;
   float radian = atan2(y, x);
-  int degree = radian * 57.3 * correctionFactor;
+  int degree = radian * 57.3;
   long dis = sqrt(sq(x) + sq(y));
   if (degree <= 90 && degree >= -90)
   {
@@ -527,6 +575,7 @@ void GoToGoal(long x, long y)
   }
 }
 
+
 /*
   The robot will move to a set goal.
   If an object is detected to be between the robot and the goal it will attempt to follow along the object until it has passed
@@ -536,7 +585,7 @@ void GoToGoal(long x, long y)
   The inputs to the function are (xGoal) and (yGoal) which are the X and Y coordinates of the goal position respectively
 */
 
-void smartGoToGoal(int xGoal, int yGoal)
+void smartgoToGoal(int xGoal, int yGoal)
 {
   object = 0;
   int wall = 0;
@@ -714,17 +763,9 @@ void smartGoToGoal(int xGoal, int yGoal)
 void spin(int degree, int speed)
 {
   set_zero();
-  int offset = 0;
-  if (degree < 0)
-  {
-    offset = 15 * degree / 90;
-  }
-  else
-  {
-    offset = 15 * degree / 90;
-  }
+  float correctionFactor = 0.97;
   int signOfDegree = constrain(degree, -1, 1);
-  int dis = degree * 3.14 * wheel_base / (2 * 180);
+  int dis = degree * correctionFactor * 3.14 * wheel_base / (2 * 180);
   int steps = dis_to_step(dis); //+ offset;
   stepperLeft.setMaxSpeed(speed);
   stepperRight.setMaxSpeed(speed);
@@ -849,7 +890,7 @@ void pivotConst(bool wheel, float degree, int speed)
   The randomness of the robot is restricted to the input of maxVal
   Non-blocking way of setting movment,
 */
-void prepMovement(int maxVal)
+void prepRandomMovement(int maxVal)
 {
   if (stepperLeft.distanceToGo() == 0)
   {
@@ -877,19 +918,17 @@ void prepMovement(int maxVal)
   Prepare movement step (such as numberof steps, max speed, and acceleration)
   the movement parameters will be equal for both wheels resulting in forward movement
 */
-void prepForward(int maxVal)
+void prepForward(int unitStep, int speed)
 {
-  if (stepperLeft.distanceToGo() == 0)
+  if (stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0)
   {
-    int randomSteps = random(maxVal) + 5;
-    int randomMaxSpeed = random(maxVal) % 400 + 250;
-    int randomAcc = random(maxVal) % 200 + 150;
-    stepperLeft.moveTo(randomSteps);
-    stepperLeft.setMaxSpeed(randomMaxSpeed);
-    stepperLeft.setAcceleration(randomAcc);
-    stepperRight.moveTo(randomSteps);
-    stepperRight.setMaxSpeed(randomMaxSpeed);
-    stepperRight.setAcceleration(randomAcc);
+    stepperLeft.moveTo(dis_to_step(unitStep));
+    stepperRight.moveTo(dis_to_step(unitStep));
+    stepperLeft.setMaxSpeed(speed);
+    stepperRight.setMaxSpeed(speed);
+    stepperLeft.setAcceleration(int(speed / 3));
+    stepperRight.setAcceleration(int(speed / 3));
+    
   }
 }
 
@@ -905,7 +944,7 @@ void randomWanderNoSpin()
 
   int maxVal = 6000; // maximum value for random number
   // while(1){
-  prepMovement(maxVal);
+  prepRandomMovement(maxVal);
   // }
   stepperLeft.run();
   stepperRight.run();
@@ -922,7 +961,7 @@ void collide(int distThresh)
   while (!object)
   {                     // sensor != close)  //Move forward while not sensing wall
     grnOn();            // Turn on green LED
-    prepMovement(6000); // prepare to move forward
+    prepRandomMovement(6000); // prepare to move forward
     stepperLeft.run();  // increment left motor
     stepperRight.run(); // increment right motor
     data = RPC.call("read_lidars").as<struct lidar>();
@@ -1026,7 +1065,7 @@ void runAway(int distThresh)
     {
       int xSens = data.front - data.back; // total X sensor = front - back
       int ySens = data.left - data.right; // total Y sensor = left - right <-- Based on directions listed in lab 1
-      GoToGoal((constrain(xSens, -1, 1) * (-distThresh) + xSens) * p, (constrain(ySens, -1, 1) * (-distThresh) + ySens) * p);
+      goToGoal((constrain(xSens, -1, 1) * (-distThresh) + xSens) * p, (constrain(ySens, -1, 1) * (-distThresh) + ySens) * p);
 
       /*Test sense data
       Serial.println(xSens);
@@ -1110,7 +1149,6 @@ void smartFollow(int collideDist, int followDist)
   follow(followDist); //
 }
 
-
 /*
   Using the pregenerated occupancy grid, calculate a route to make it to the goal
   The route to the goal will be stored as an array of moves that the robot should take
@@ -1123,7 +1161,7 @@ void smartFollow(int collideDist, int followDist)
   *moveList - char array of the list of moves necessary
   currentMoveNumber - current number of moves made (call @ 0 always)
 */
-//global flag for NavMaze
+// global flag for NavMaze
 bool doneFlag = false;
 void navMaze(int startX, int startY, int goalX, int goalY, int occGrid[][6], char *moveList, int currentMoveNumber)
 {
@@ -1198,7 +1236,7 @@ void navMaze(int startX, int startY, int goalX, int goalY, int occGrid[][6], cha
     pathSpace(0, 1, currentMoveNumber, moveList);
     navMaze(startX, startY + 1, goalX, goalY, occGrid, moveList, currentMoveNumber + 1);
   }
-  return; //dead-end
+  return; // dead-end
 }
 
 /*
@@ -1206,29 +1244,34 @@ void navMaze(int startX, int startY, int goalX, int goalY, int occGrid[][6], cha
 */
 void pathSpace(int xDir, int yDir, int currMove, char *moveList)
 {
-    if (xDir > 0) moveList[currMove] = 'R';         // Right
-    else if (xDir < 0) moveList[currMove] = 'L';    // Left
-    else if (yDir > 0) moveList[currMove] = 'D';    // Down
-    else if (yDir < 0) moveList[currMove] = 'U';    // Up
-    else moveList[currMove] = 'X';                  // N/A
+  if (xDir > 0)
+    moveList[currMove] = 'R'; // Right
+  else if (xDir < 0)
+    moveList[currMove] = 'L'; // Left
+  else if (yDir > 0)
+    moveList[currMove] = 'D'; // Down
+  else if (yDir < 0)
+    moveList[currMove] = 'U'; // Up
+  else
+    moveList[currMove] = 'X'; // N/A
 }
 
-//Helper Functions of path finding
+// Helper Functions of path finding
 /*
   Print out the 2D array occupancy grid to serial terminal for debugging
 */
 void printOccGrid(int occGrid[][6])
 {
-    Serial.println("Occupancy Grid:");
-    for (int i = 0; i < 6; i++)
+  Serial.println("Occupancy Grid:");
+  for (int i = 0; i < 6; i++)
+  {
+    for (int j = 0; j < 6; j++)
     {
-        for (int j = 0; j < 6; j++)
-        {
-            Serial.print(occGrid[i][j]);
-            Serial.print(" ");
-        }
-        Serial.println();
+      Serial.print(occGrid[i][j]);
+      Serial.print(" ");
     }
+    Serial.println();
+  }
 }
 
 /*
@@ -1236,86 +1279,161 @@ void printOccGrid(int occGrid[][6])
 */
 void printMoves(char *moveList, int length = 16)
 {
-    for (int i = 0; i < length; i++)
-    {
-        Serial.print(moveList[i]);
-        Serial.print(" ");
-    }
-    Serial.println();
+  for (int i = 0; i < length; i++)
+  {
+    Serial.print(moveList[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
 }
 
 /*
 
 */
-void moveThroughMaze(char *moveList, int gridSize = 16, int unitStep = 46)
+void moveThroughMaze(char *moveList, int gridSize = 16, int unitStep = 47)
 {
-  //move until no next move
+  // move until no next move
   int currentMoveNumber = 0;
-  while(moveList[currentMoveNumber] != 'X')
+  while (moveList[currentMoveNumber] != 'X')
   {
-    switch(moveList[currentMoveNumber]) {
-      case 'U':
-      GoToGoal(unitStep, 0);
-      break;
-      
-      case 'D':
-      GoToGoal(-unitStep, 0);
-
+    switch (moveList[currentMoveNumber])
+    {
+    case 'U':
+      goToGoalWithReturn(unitStep, 0);
       break;
 
-      case 'R':
-      GoToGoal(0, -unitStep);
+    case 'D':
+      goToGoalWithReturn(-unitStep, 0);
       break;
 
-      case 'L':
-      GoToGoal(0, unitStep);
+    case 'R':
+      goToGoalWithReturn(0, -unitStep);
+      break;
+
+    case 'L':
+      goToGoalWithReturn(0, unitStep);
       break;
     }
     currentMoveNumber += 1;
   }
 }
-/*
-void TopologicalPathFollow(char *moveList)
+
+void hallwayCorrect(int distanceThreshold)
 {
-  int distThreshold = 15;
-  while(moveList[currentMoveNumber] != 'T')
+  if(data.left < distanceThreshold && data.left)    //too closefrom Left
   {
-    switch(moveList[currentMoveNumber]) {
-      case 'R':
-      GoToGoal(0, -unitStep);
-      break;
-
-      case 'L':
-      GoToGoal(0, unitStep);
-      break;
-    }
-    while(!passageFlag)
-    {
-      if(stepperLeft.distanceToGo() == 0 || stepperRight.distanceToGo() == 0){
-        stepperLeft.moveTo()
-      }
-      if(stepperRight)
-
-      if(!data.left || data.left > distThreshold)
-      {
-        passageFlag = True;
-      }
-      if(!data.right || data.right > distThreshold)
-      {
-        passageFlag = True;
-      }
-
-    }
-    currentMoveNumber += 1;s
+    Serial.println("Run from Left");
+    pivot(1, -30);
+    pivot(0, 30);
+    forward(5, 300);
   }
-  while(!front.data || front.data > distThreshold)
+  if(data.right < distanceThreshold && data.right)  //too close to Right
   {
-    
+    Serial.println("Run from Right");
+    pivot(0, 30);
+    pivot(1, -30);
+    forward(5, 300);
   }
-  // moveToDeadEnd();
 }
-*/
 
+/*
+  Check the side Lidars for if there is an OPENING
+  returns int: 0 = no opening, 1 = right opening, 2 = left opening, 3 = both open
+*/
+int checkSides(int distanceThreshold)
+{
+  int result = 0;
+  // Serial.println("pre-data pull");
+  data = RPC.call("read_lidars").as<struct lidar>();
+  // Serial.println("post-data pull");
+
+  if (!data.right && data.right > distanceThreshold)
+  {
+    result += 1;
+  }
+  if (!data.left && data.left > distanceThreshold)
+  {
+    result += 2;
+  }
+  return result;
+}
+
+bool checkFront(int distanceThreshold)
+{
+  data = RPC.call("read_lidars").as<struct lidar>();
+  return (data.front && data.front < distanceThreshold);
+}
+
+void topologicalPathFollow(char *moveList, int unitStep = 47)
+{
+  //variables
+  bool leftPassage = false;
+  bool rightPassage = false;
+  int distThreshold = 15;
+  int currentMoveNumber = 0;
+  int sideData = 0;
+  int interval = 500;
+  int previousMillis = millis();
+  int moveSpeed = 300;
+  // Serial.println(moveList);
+  while (moveList[currentMoveNumber] != 'T')  //while not last move
+  {
+    while (!leftPassage && moveList[currentMoveNumber] == 'L' || !rightPassage && moveList[currentMoveNumber] == 'R') // no opening matching move option
+    {
+      // Serial.println(millis());
+      // Check lidar
+      if (millis() - previousMillis >= interval)
+      {
+        // Serial.println("checkingData");
+        sideData = checkSides(distThreshold);
+        // Serial.println("post-sideData");
+        leftPassage = (sideData == 1 || sideData == 3);
+        rightPassage = (sideData == 2 || sideData == 3);
+        // Serial.println("passed passage checks");
+        hallwayCorrect(distThreshold-5);
+        previousMillis = millis();
+        // Serial.print("Side Data: ");
+        // Serial.println(sideData);
+        print_sensors();
+      }
+      // Prepare to move forward(set moveTo if reached distance)
+      prepForward(unitStep, moveSpeed);
+      // run stepper motors
+      stepperRight.run();
+      stepperLeft.run();
+    }
+    if (moveList[currentMoveNumber] == 'L') // Want left move + possible
+    {
+      Serial.println("Moved Left");
+      goToGoal(0, unitStep);
+    }
+    else // Want right move + possible
+    {
+      Serial.println("Moved Right");
+      goToGoal(0, -unitStep);
+    }
+    leftPassage = false;
+    rightPassage = false;
+    currentMoveNumber += 1;
+  }
+
+  bool frontBlock = false;
+  while(frontBlock)
+  {
+    if (millis() - previousMillis >= interval)
+      {
+      frontBlock = checkFront(distThreshold);
+      previousMillis = millis();
+    }
+    
+    //prep forward movement
+    prepForward(unitStep, moveSpeed);
+    stepperLeft.run();
+    stepperRight.run();
+
+  }
+  Serial.println("Terminated");
+}
 
 void setup()
 {
@@ -1326,27 +1444,27 @@ void setup()
   delay(5000);
   char moves[16] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
   int occGrid[6][6] = {99, 99, 99, 99, 99, 99,
-                     99, 0, 0, 0, 0, 99,
-                     99, 99, 0, 0, 99, 99,
-                     99, 99, 0, 99, 99, 99,
-                     99, 0, 0, 0, 0, 99,
-                     99, 99, 99, 99, 99, 99};
+                       99, 0, 99, 99, 0, 99,
+                       99, 0, 0, 0, 0, 99,
+                       99, 0, 99, 99, 0, 99,
+                       99, 0, 99, 0, 0, 99,
+                       99, 99, 99, 99, 99, 99};
   int startX = 1; // changes to current X per loop (1-4)
-  int startY = 1; // changes to current Y per loop (1-4)
-  int goalX = 4;  // Never changes (1-4)
+  int startY = 4; // changes to current Y per loop (1-4)
+  int goalX = 3;  // Never changes (1-4)
   int goalY = 4;  // Never changes (1-4)
 
-  navMaze(startX, startY, goalX, goalY, occGrid, moves, 0);
-  printMoves(moves);
-  moveThroughMaze(moves);
+  // navMaze(startX, startY, goalX, goalY, occGrid, moves, 0);
+  // printMoves(moves);
+  // moveThroughMaze(moves);
+  delay(5000);
+  char topMove[4] = {'R', 'R', 'R', 'T'};
+  topologicalPathFollow(topMove);
+
 }
 
 void loop()
 {
-  // GoToGoal(0, 46);
-  // delay(1000);
-  // GoToGoal(46, 0);
-  // delay(1000);
   grnOn();
   delay(500);
   grnOff();
