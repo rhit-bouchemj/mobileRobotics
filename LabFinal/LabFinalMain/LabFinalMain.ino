@@ -922,6 +922,7 @@ void prepForward(int unitStep, int speed)
 {
   if (stepperLeft.distanceToGo() == 0 && stepperRight.distanceToGo() == 0)
   {
+    set_zero();
     stepperLeft.moveTo(dis_to_step(unitStep));
     stepperRight.moveTo(dis_to_step(unitStep));
     stepperLeft.setMaxSpeed(speed);
@@ -1347,13 +1348,13 @@ int checkSides(int distanceThreshold)
   data = RPC.call("read_lidars").as<struct lidar>();
   // Serial.println("post-data pull");
 
-  if (!data.right && data.right > distanceThreshold)
-  {
-    result += 1;
-  }
-  if (!data.left && data.left > distanceThreshold)
+  if (!data.right || data.right > distanceThreshold)
   {
     result += 2;
+  }
+  if (!data.left || data.left > distanceThreshold)
+  {
+    result += 1;
   }
   return result;
 }
@@ -1369,7 +1370,7 @@ void topologicalPathFollow(char *moveList, int unitStep = 47)
   //variables
   bool leftPassage = false;
   bool rightPassage = false;
-  int distThreshold = 15;
+  int distThreshold = 18;
   int currentMoveNumber = 0;
   int sideData = 0;
   int interval = 500;
@@ -1394,6 +1395,10 @@ void topologicalPathFollow(char *moveList, int unitStep = 47)
         previousMillis = millis();
         // Serial.print("Side Data: ");
         // Serial.println(sideData);
+        // Serial.print("left passage");
+        // Serial.println(leftPassage);
+        // Serial.print("right passage");
+        // Serial.println(rightPassage);
         print_sensors();
       }
       // Prepare to move forward(set moveTo if reached distance)
@@ -1405,11 +1410,13 @@ void topologicalPathFollow(char *moveList, int unitStep = 47)
     if (moveList[currentMoveNumber] == 'L') // Want left move + possible
     {
       Serial.println("Moved Left");
+      forward(5, 300);
       goToGoal(0, unitStep);
     }
     else // Want right move + possible
     {
       Serial.println("Moved Right");
+      forward(5, 300);
       goToGoal(0, -unitStep);
     }
     leftPassage = false;
@@ -1418,7 +1425,7 @@ void topologicalPathFollow(char *moveList, int unitStep = 47)
   }
 
   bool frontBlock = false;
-  while(frontBlock)
+  while(!frontBlock)
   {
     if (millis() - previousMillis >= interval)
       {
