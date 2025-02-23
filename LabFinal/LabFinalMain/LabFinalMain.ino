@@ -67,6 +67,67 @@ int delta_r_step = 0;
 float global_theta = 0;
 float delta_theta = 0;
 
+
+// WIFI connection
+#include <ArduinoJson.h>
+
+#include <ArduinoMqttClient.h>
+#if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
+#include <WiFiNINA.h>
+#elif defined(ARDUINO_SAMD_MKR1000)
+#include <WiFi101.h>
+#elif defined(ARDUINO_ARCH_ESP8266)
+#include <ESP8266WiFi.h>
+#elif defined(ARDUINO_PORTENTA_H7_M7) || defined(ARDUINO_NICLA_VISION) || defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_GIGA) || defined(ARDUINO_OPTA)
+#include <WiFi.h>
+#elif defined(ARDUINO_PORTENTA_C33)
+#include <WiFiC3.h>
+#elif defined(ARDUINO_UNOR4_WIFI)
+#include <WiFiS3.h>
+#endif
+
+#include "arduino_secrets.h"
+///////please enter your sensitive data in the Secret tab/arduino_secrets.h
+char ssid[] = "zangs1";      // your network SSID (name)
+char pass[] = "1234567890";  // your network password (use for WPA, or use as key for WEP)
+
+WiFiClient wifiClient;
+MqttClient mqttClient(wifiClient);
+
+const char broker[] = "test.mosquitto.org";
+int port = 1883;
+const char topic[] = "arduino/zang";
+
+unsigned long previousMillis = 0;
+
+int count = 0;
+
+//Json
+JsonDocument doc;
+char output[256];
+char input[256];
+String premessage = "";
+String command = "";
+
+//mapping
+
+int array[6][6];
+const byte numChars = 32;
+char receivedChars[numChars];  // an array to store the received data
+int flag[2][5];
+int flag_count = 0;
+int traveled[20][2];
+int current[2];
+
+int x = 0;
+int y = 1;
+int tc = 0;
+
+int gridx = 1;
+int gridy = 1;
+int facing = 0;
+
+
 // a struct to hold lidar data
 struct lidar
 {
@@ -518,6 +579,54 @@ void getParallel(int location)
     }
   }
 }
+
+
+void GoToGrid(int x, int y) {
+  Serial.print("facing: ");
+  Serial.println(facing);
+  Serial.print("goal x: ");
+  Serial.println(x);
+  Serial.print("goal y: ");
+  Serial.println(y);
+  Serial.print("current x: ");
+  Serial.println(gridx);
+  Serial.print("current x: ");
+  Serial.println(gridy);
+
+  int dx = x - gridx;
+  int dy = y - gridy;
+  float radian = atan2(dy, dx);
+  int degree = radian * 57.3;
+  int dtheta = 0;
+  if (facing == 0) {
+    dtheta = -degree + 90;
+  } else if (facing == 1) {
+    dtheta = -degree + 180;
+  } else if (facing == 2) {
+    dtheta = -degree - 90;
+  } else {
+    dtheta = -degree;
+  }
+  Serial.print("sprin: ");
+  Serial.println(dtheta);
+  spin(dtheta, 500);
+  if (dx >= 1) {
+    facing = 3;
+  } else if (dx <= -1) {
+    facing = 1;
+  } else if (dy >= 1) {
+    facing = 0;
+  } else if (dy <= -1) {
+    facing = 2;
+  }
+  Serial.print("now facing: ");
+  Serial.println(facing);
+
+  forward(42, 500);
+  gridx = x;
+  gridy = y;
+}
+
 
 /*
   The robot will move to a set position, specified by the x and y value
@@ -1150,6 +1259,375 @@ void smartFollow(int collideDist, int followDist)
   follow(followDist); //
 }
 
+
+void followCommand() {
+  if (command != premessage) {
+    if (command == "forward") {  // prep forward
+      Serial.println("here");
+      set_zero();
+      stepperLeft.moveTo(9000);
+      stepperRight.moveTo(9000);
+      stepperLeft.setMaxSpeed(300);
+      stepperRight.setMaxSpeed(300);
+      stepperLeft.setAcceleration(200);
+      stepperRight.setAcceleration(200);
+    } else if (command == "backward") {
+      set_zero();
+      stepperLeft.moveTo(-9000);
+      stepperRight.moveTo(-9000);
+      stepperLeft.setMaxSpeed(300);
+      stepperRight.setMaxSpeed(300);
+      stepperLeft.setAcceleration(200);
+      stepperRight.setAcceleration(200);
+    } else if (command == "spin_right") {
+      set_zero();
+      stepperLeft.moveTo(9000);
+      stepperRight.moveTo(-9000);
+      stepperLeft.setMaxSpeed(300);
+      stepperRight.setMaxSpeed(300);
+      stepperLeft.setAcceleration(200);
+      stepperRight.setAcceleration(200);
+    } else if (command == "spin_left") {
+      set_zero();
+      stepperLeft.moveTo(-9000);
+      stepperRight.moveTo(9000);
+      stepperLeft.setMaxSpeed(300);
+      stepperRight.setMaxSpeed(300);
+      stepperLeft.setAcceleration(200);
+      stepperRight.setAcceleration(200);
+    }
+    premessage = command;
+    Serial.println("__________");
+    Serial.println(premessage);
+  }
+
+  if (command == "forward") {
+    stepperLeft.run();
+    stepperRight.run();
+
+  } else if (command == "backward") {
+    stepperLeft.run();
+    stepperRight.run();
+
+  } else if (command == "spin_right") {
+    stepperLeft.run();
+    stepperRight.run();
+
+  } else if (command == "spin_left") {
+    stepperLeft.run();
+    stepperRight.run();
+
+  } else if (command == "stop") {
+    stop();
+  }
+}
+
+
+void sendSensor(int interval) {
+  if (millis() - previousMillis >= interval) {
+
+    data = RPC.call("read_lidars").as<struct lidar>();
+
+    doc["front"] = data.front;
+    doc["back"] = data.back;
+    doc["left"] = data.left;
+    doc["right"] = data.right;
+
+    serializeJson(doc, output);
+
+    // send message, the Print interface can be used to set the message contents
+    mqttClient.beginMessage(topic);
+    mqttClient.print(output);
+    mqttClient.endMessage();
+
+    Serial.println();
+
+    previousMillis = millis();
+  }
+}
+
+void sendMap() {
+  for (int i = 0; i < 6; i++) {
+    for (int j = 0; j < 6; j++) {
+      doc["map"][i][j] = array[i][j];
+    }
+  }
+  serializeJson(doc, output);
+  // send message, the Print interface can be used to set the message contents
+  mqttClient.beginMessage(topic);
+  mqttClient.print(output);
+  mqttClient.endMessage();
+}
+
+
+
+
+void mapping() {
+
+
+  array[1][1] = 0;
+  traveled[tc][x] = 1;
+  traveled[tc][y] = 1;
+  current[x] = 1;
+  current[y] = 1;
+  tc = tc + 1;
+  sendMap();
+  printArray();
+  bool done = false;
+
+  int surrand[4];
+  int c[4];
+
+  while (done == false) {
+    //read sensors
+    data = RPC.call("read_lidars").as<struct lidar>();
+    if (data.front < 30 && data.front != 0) {
+      c[0] = 1;
+    } else {
+      c[0] = 0;
+    }
+    if (data.right < 30 && data.right != 0) {
+      c[1] = 1;
+    } else {
+      c[1] = 0;
+    }
+    if (data.back < 30 && data.back != 0) {
+      c[2] = 1;
+    } else {
+      c[2] = 0;
+    }
+    if (data.left < 30 && data.left != 0) {
+      c[3] = 1;
+    } else {
+      c[3] = 0;
+    }
+    //Serial.println(global_theta);
+    //Serial.println(data.front);
+    //Serial.println(data.right);
+    //Serial.println(data.back);
+    //Serial.println(data.left);
+    if (facing == 0) {
+      surrand[0] = c[0];
+      surrand[1] = c[1];
+      surrand[2] = c[2];
+      surrand[3] = c[3];
+    } else if (facing == 3) {
+      surrand[0] = c[1];
+      surrand[1] = c[2];
+      surrand[2] = c[3];
+      surrand[3] = c[0];
+    } else if (facing == 2) {
+      surrand[0] = c[2];
+      surrand[1] = c[3];
+      surrand[2] = c[0];
+      surrand[3] = c[1];
+    } else {
+      surrand[0] = c[3];
+      surrand[1] = c[0];
+      surrand[2] = c[1];
+      surrand[3] = c[2];
+    }
+    Serial.print("surrand: ");
+    Serial.print(surrand[0]);
+    Serial.print(surrand[1]);
+    Serial.print(surrand[2]);
+    Serial.println(surrand[3]);
+
+
+
+    int direction[0];
+    int j = 0;
+    for (int i = 0; i < 4; i++) {  // update map
+      if (surrand[i] == 0) {
+        direction[j] = i;
+        j = j + 1;
+        if (i == 0) {
+          array[current[y] + 1][current[x]] = 0;
+        } else if (i == 1) {
+          array[current[y]][current[x] - 1] = 0;
+        } else if (i == 2) {
+          array[current[y] - 1][current[x]] = 0;
+        } else {
+          array[current[y]][current[x] + 1] = 0;
+        }
+
+      } else {
+        if (i == 0) {
+          array[current[y] + 1][current[x]] = 9;
+        } else if (i == 1) {
+          array[current[y]][current[x] - 1] = 9;
+        } else if (i == 2) {
+          array[current[y] - 1][current[x]] = 9;
+        } else {
+          array[current[y]][current[x] + 1] = 9;
+        }
+      }
+    }
+
+    sendMap();
+    printArray();
+
+
+    if (j > 2) {  //flag if have more than one option
+      flag[x][flag_count] = current[x];
+      flag[y][flag_count] = current[y];
+      Serial.println("flag!");
+      //Serial.println(flag_count);
+      //Serial.print("x: ");
+      //Serial.println(flag[x][flag_count]);
+      //Serial.print("y: ");
+      //Serial.println(flag[y][flag_count]);
+      flag_count = flag_count + 1;
+    }
+
+    bool moved = false;
+    Serial.println(j);
+    for (int a = 0; a < j; a++) {
+      Serial.println(direction[0]);
+      if (direction[a] == 0 && moved == false) {  // move base on direction
+        //Serial.println("move down");
+        current[y] = current[y] + 1;
+        moved = true;
+        for (int i = 0; i < tc; i++) {
+          if (traveled[i][x] == current[x] && moved == true) {
+            if (traveled[i][y] == current[y]) {
+              current[y] = current[y] - 1;
+              moved = false;
+              //break;
+            }
+          }
+        }
+      }
+      if (direction[a] == 1 && moved == false) {
+        //Serial.println("move left");
+        current[x] = current[x] - 1;
+        moved = true;
+        for (int i = 0; i <= tc; i++) {
+          if (traveled[i][x] == current[x] && moved == true) {
+            if (traveled[i][y] == current[y]) {
+              current[x] = current[x] + 1;
+              moved = false;
+              //break;
+            }
+          }
+        }
+      }
+      if (direction[a] == 2 && moved == false) {
+        //Serial.println("move up");
+        current[y] = current[y] - 1;
+        Serial.println(current[y]);
+        moved = true;
+        for (int i = 0; i <= tc; i++) {
+          if (traveled[i][x] == current[x] && moved == true) {
+            if (traveled[i][y] == current[y]) {
+              current[y] = current[y] + 1;
+              Serial.println(current[y]);
+              moved = false;
+              //break;
+            }
+          }
+        }
+      }
+      if (direction[a] == 3 && moved == false) {
+        //Serial.println("move right");
+        current[x] = current[x] + 1;
+        moved = true;
+        for (int i = 0; i <= tc; i++) {
+          if (traveled[i][x] == current[x] && moved == true) {
+            if (traveled[i][y] == current[y]) {
+              current[x] = current[x] - 1;
+              moved = false;
+              //break;
+            }
+          }
+        }
+      }
+    }
+    if (moved == false) {
+      Serial.println("stuck");
+      bool unknow = false;
+      for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 6; j++) {
+          if (array[i][j] == 1) {
+            unknow = true;
+          }
+        }
+      }
+
+      if (unknow == false) {
+        done = true;
+      }
+
+      if (done == false) {
+        bool backed = false;
+        int k = 0;
+        while (backed != true) {
+
+          current[x] = traveled[tc - 2 - k][x];
+          current[y] = traveled[tc - 2 - k][y];
+
+          //Serial.println(current[x]);
+          //Serial.println(current[y]);
+          if (current[x] == flag[x][flag_count - 1] && current[y] == flag[y][flag_count - 1]) {
+            backed = true;
+          } else {
+            GoToGrid(current[x], current[y]);
+          }
+          k = k + 1;
+          if (k > tc) {
+            Serial.print("finished");
+            done = true;
+          }
+        }
+      }
+    }
+
+
+    if (done == false) {
+      GoToGrid(current[x], current[y]);
+
+
+
+
+      traveled[tc][x] = current[x];
+      traveled[tc][y] = current[y];
+
+
+
+      Serial.println(tc);
+      Serial.print("current Position: ");
+      Serial.print(current[x]);
+      Serial.print(" ");
+      Serial.println(current[y]);
+
+      for (int i = 0; i <= tc; i++) {
+        Serial.print(traveled[i][x]);
+        Serial.print("  ");
+        Serial.println(traveled[i][y]);
+      }
+
+
+
+      tc = tc + 1;
+      delay(500);
+    }
+  }
+}
+
+void printArray() {
+  for (int i = 0; i < 6; i++) {
+    for (int j = 0; j < 6; j++) {
+      if (j == 5) {
+        Serial.println(array[i][j]);
+      } else {
+        Serial.print(array[i][j]);
+        Serial.print(" ");
+      }
+    }
+  }
+}
+
+
 /*
   Using the pregenerated occupancy grid, calculate a route to make it to the goal
   The route to the goal will be stored as an array of moves that the robot should take
@@ -1449,6 +1927,67 @@ void setup()
 
   Serial.begin(9600);
   delay(5000);
+
+  //initialize map
+  for (int i = 0; i < 6; i++) {
+    for (int j = 0; j < 6; j++) {
+      if (i == 0 || j == 0 || i == 5 || j == 5) {
+        array[i][j] = 9;
+      } else {
+        array[i][j] = 1;
+      }
+    }
+  }
+
+
+  // attempt to connect to WiFi network:
+  Serial.print("Attempting to connect to WPA SSID: ");
+  Serial.println(ssid);
+  while (WiFi.begin(ssid, pass) != WL_CONNECTED) {
+    // failed, retry
+    Serial.print(".");
+    delay(5000);
+  }
+
+  Serial.println("You're connected to the network");
+  Serial.println();
+  Serial.print("Attempting to connect to the MQTT broker: ");
+  Serial.println(broker);
+
+  if (!mqttClient.connect(broker, port)) {
+    Serial.print("MQTT connection failed! Error code = ");
+    Serial.println(mqttClient.connectError());
+
+    while (1)
+      ;
+  }
+
+  Serial.println("You're connected to the MQTT broker!");
+  Serial.println();
+
+  grnOn();
+  delay(3000);
+  grnOff();
+
+  // set the message receive callback
+  mqttClient.onMessage(onMqttMessage);
+
+  Serial.print("Subscribing to topic: ");
+  Serial.println(topic);
+  Serial.println();
+
+  // subscribe to a topic
+  mqttClient.subscribe(topic);
+
+  // topics can be unsubscribed using:
+  // mqttClient.unsubscribe(topic);
+
+  Serial.print("Waiting for messages on topic: ");
+  Serial.println(topic);
+  Serial.println();
+
+
+
   char moves[16] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
   int occGrid[6][6] = {99, 99, 99, 99, 99, 99,
                        99, 0, 99, 99, 0, 99,
